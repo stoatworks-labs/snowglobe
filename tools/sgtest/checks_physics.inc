@@ -25,8 +25,10 @@ bool startRig( Rig& rig, int w, int h, const Perturb& perturb, const Floats* pic
 
 //---------------------------------------------------------------------------
 // The GPA's tables (1963), as printed: what the measured speeds are held to.
-// Table 4: density at 20 C, g/ml. Table 17 (Segur and Oberstar 1951): cP at
-// 20 C. Table 23 (Hoyt 1934): n_D at 20.0 C, per 1 %, 60-80 %.
+// Table 4 (Bosart and Snoddy): density at 20 C, g/ml, every 10 %. Table 17
+// (Segur and Oberstar 1951): cP at 20 C. Table 23 (Hoyt 1934): n_D at
+// 20.0 C, per 1 %, 60-80 %. Only rows the tables print: Table 4 has no 65 %
+// or 75 % row, so nothing here interpolates one.
 //---------------------------------------------------------------------------
 struct TableRow
 {
@@ -34,10 +36,12 @@ struct TableRow
 };
 const TableRow kGpaRows[] = {
 	{ 0.60, 1153.80, 10.8e-3 },
-	{ 0.65, 1167.25, 15.2e-3 },
 	{ 0.70, 1181.25, 22.5e-3 },
-	{ 0.75, 1194.95, 35.5e-3 },
 	{ 0.80, 1208.50, 60.1e-3 },
+};
+/// Table 17's 20 C column, every row it prints from 60 % to 80 %.
+const std::pair< double, double > kGpaViscosity[] = {
+	{ 0.60, 10.8e-3 }, { 0.65, 15.2e-3 }, { 0.67, 17.7e-3 }, { 0.70, 22.5e-3 }, { 0.75, 35.5e-3 }, { 0.80, 60.1e-3 },
 };
 const double kGpaIndex[ 21 ] = { 1.41299, 1.41448, 1.41597, 1.41746, 1.41895, 1.42044, 1.42193, 1.42342, 1.42491, 1.42640, 1.42789,
 	                             1.42938, 1.43087, 1.43236, 1.43385, 1.43534, 1.43683, 1.43832, 1.43982, 1.44135, 1.44290 };

@@ -27,7 +27,8 @@ enum CpuHook : int
 	kCpuLeakState       = 1 << 4,///< the composite leaves its program and textures bound
 	kCpuWaterIndex      = 1 << 5,///< the scene refracts with water's n, whatever the fill
 	kCpuFlakesStraight  = 1 << 6,///< flakes projected without refraction
-	kCpuAnyBand         = 1 << 7 ///< a kick from any band, not the lowest
+	kCpuAnyBand         = 1 << 7,///< a kick from any band, not the lowest
+	kCpuDropPresses     = 1 << 8 ///< presses between two frames collapse to one
 };
 
 /// Kicks are earshot onsets in this band only (40-160 Hz).

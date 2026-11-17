@@ -148,7 +148,7 @@ int runMagnify( const Perturb& perturb )
 			const double globePx = 0.5 * 0.9 * raster.h;
 			const double xiSil   = static_cast< double >( silhouetteTangentLD() );
 			//d such that the lines are at least 40 px apart.
-			const double d = std::max( 0.05, 40.0 * kD / ( 2.0 * n * globePx / xiSil ) );
+			const double d = std::max( 0.05, 40.0 * static_cast< double >( kD ) / ( 2.0 * n * globePx / xiSil ) );
 			Rig rig;
 			const Floats card = lineCard( raster.w, raster.h, { -d, d }, { -d, d }, 0.01 );
 			if( !startRig( rig, raster.w, raster.h, perturb, &card ) )

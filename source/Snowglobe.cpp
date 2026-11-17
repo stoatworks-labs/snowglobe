@@ -315,7 +315,9 @@ std::vector< ShakeEvent > SnowglobePlugin::gatherEvents( int64_t frameStartUs, i
 	const double S         = ShakeFromParam( params[ PT_SHAKE ] );
 	std::vector< ShakeEvent > events;
 
-	//The button, at the frame: a full shake.
+	//The button, at the frame: a full shake each press.
+	if( cpuHooks & kCpuDropPresses )
+		shakePresses = std::min( shakePresses, 1 );
 	for( ; shakePresses > 0; --shakePresses )
 		events.push_back( { frameUs, 1.0 } );
 

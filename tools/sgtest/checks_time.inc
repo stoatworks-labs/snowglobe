@@ -11,85 +11,100 @@ struct RateRun
 {
 	std::vector< Floats > frames;             ///< at the common instants
 	std::vector< std::vector< V3 > > places;  ///< flakes' centres there
-	std::vector< int64_t > shakes;
-	double fastest = 0.0;                     ///< m/s, the quickest flake seen
+	std::vector< uint64_t > hashes;           ///< the stored state there
+	std::vector< int64_t > shakes;            ///< the placed shakes' instants
+	std::vector< int64_t > beats;             ///< the beat run's shake instants
 };
 
+/// Three shakes placed by the harness at instants on no frame at 24, 60 or
+/// 144 fps and on no 8 ms step: the stored state and the picture at every
+/// common half second must be the same bits at every rate (the state is a
+/// function of the events' instants alone, Globe.h). Then the host's beat at
+/// 97 BPM for 6 s: its shakes' instants within 2 us.
 bool rateRun( int w, int h, double fps, const Perturb& perturb, RateRun& out )
 {
-	Rig rig;
-	rig.fps = fps;
-	if( !startRig( rig, w, h, perturb ) )
-		return false;
-	rig.Set( PT_TRIGGER_ON, static_cast< float >( TriggerOn::Beat ) );
-	rig.Set( PT_SHAKE, 0.5f );
-	rig.beatBpm      = kOffGridBpm;
-	const int every  = static_cast< int >( std::lround( fps / 2.0 ) );//each 0.5 s
-	const int frames = static_cast< int >( std::lround( fps * 6.0 ) );
-	for( int f = 1; f <= frames; ++f )
 	{
-		if( !rig.Render( 1 ) )
+		Rig rig;
+		rig.fps = fps;
+		if( !startRig( rig, w, h, perturb ) )
 			return false;
-		if( f % every != 0 )
-			continue;
-		out.frames.push_back( rig.Output() );
-		const Physics ph = rig.plugin.CurrentPhysics();
-		std::vector< V3 > p;
-		rig.plugin.GlobeForTest().Positions( rig.plugin.LastFrame().clockUs, ph, p );
-		out.places.push_back( p );
-		const V3 W = rig.plugin.GlobeForTest().Swirl();
-		out.fastest = std::max( out.fastest, std::sqrt( dot( W, W ) ) * kRadius + 0.01 );
+		rig.plugin.QueueShakeForTest( 317'100, 1.0 );
+		rig.plugin.QueueShakeForTest( 1'234'500, 0.6 );
+		rig.plugin.QueueShakeForTest( 2'000'700, 0.8 );
+		const int every  = static_cast< int >( std::lround( fps / 2.0 ) );
+		const int frames = static_cast< int >( std::lround( fps * 4.0 ) );
+		for( int f = 1; f <= frames; ++f )
+		{
+			if( !rig.Render( 1 ) )
+				return false;
+			//Frame f is at (f - 1) / fps: the common instants are k / 2 s.
+			if( ( f - 1 ) % every != 0 || f == 1 )
+				continue;
+			out.frames.push_back( rig.Output() );
+			std::vector< V3 > p;
+			rig.plugin.GlobeForTest().Positions( rig.plugin.LastFrame().clockUs, rig.plugin.CurrentPhysics(), p );
+			out.places.push_back( p );
+			out.hashes.push_back( rig.plugin.LastFrame().stateHash );
+		}
+		for( const ShakeRecord& s : rig.plugin.ShakeLog() )
+			out.shakes.push_back( s.us );
 	}
-	for( const ShakeRecord& s : rig.plugin.ShakeLog() )
-		out.shakes.push_back( s.us );
+	{
+		Rig rig;
+		rig.fps = fps;
+		if( !startRig( rig, w, h, perturb ) )
+			return false;
+		rig.Set( PT_TRIGGER_ON, static_cast< float >( TriggerOn::Beat ) );
+		rig.Set( PT_SHAKE, 0.5f );
+		rig.beatBpm = kOffGridBpm;
+		if( !rig.Render( static_cast< int >( std::lround( fps * 6.0 ) ) ) )
+			return false;
+		for( const ShakeRecord& s : rig.plugin.ShakeLog() )
+			out.beats.push_back( s.us );
+	}
 	return true;
 }
 
 int runRate( const Perturb& perturb )
 {
-	std::printf( "\n=== rate: the same run (the host's beat at 97 BPM, Shake 0.5, 600 flakes, 6 s) at 24, 60 and 144 fps; at every common half "
-	             "second the shakes' instants agree within 2 us (the float bar phase's resolution, rounded), the flakes' centres within the fastest "
-	             "flake's speed times that, the pixels within half an 8-bit code\n" );
+	std::printf( "\n=== rate: three shakes placed at 0.3171, 1.2345 and 2.0007 s (on no frame and no 8 ms step), at 24, 60 and 144 fps: at every "
+	             "common half second to 4 s the state, every flake's centre and every output float the same bits; the host's beat at 97 BPM "
+	             "for 6 s: the same shakes, within 2 us (the float bar phase, 2^-24 of a bar = 0.15 us here, and the us rounding)\n" );
 	for( const Raster& raster : kRasters )
 	{
 		RateRun runs[ 3 ];
-		const double rates[ 3 ] = { 24.0, 60.0, 144.0 };
+		const double rates[ 3 ] = { 60.0, 24.0, 144.0 };
 		for( int k = 0; k < 3; ++k )
 			if( !rateRun( raster.w, raster.h, rates[ k ], perturb, runs[ k ] ) )
 				return 1;
-		int64_t worstShake = 0;
-		bool sameCount     = true;
-		double worstPlace = 0.0, worstPixel = 0.0, fastest = 0.0;
-		int identical = 0, compared = 0;
 		for( int k = 1; k < 3; ++k )
 		{
-			sameCount = sameCount && runs[ k ].shakes.size() == runs[ 0 ].shakes.size() && runs[ k ].frames.size() == runs[ 0 ].frames.size();
-			if( !sameCount )
-				break;
-			for( size_t s = 0; s < runs[ 0 ].shakes.size(); ++s )
-				worstShake = std::max< int64_t >( worstShake, std::llabs( runs[ k ].shakes[ s ] - runs[ 0 ].shakes[ s ] ) );
-			for( size_t f = 0; f < runs[ 0 ].frames.size(); ++f )
+			const RateRun &a = runs[ 0 ], &b = runs[ k ];
+			const bool sameCounts = a.frames.size() == b.frames.size() && a.shakes.size() == b.shakes.size() && a.beats.size() == b.beats.size();
+			size_t floats = 0, places = 0, hashes = 0;
+			int64_t placed = 0, beat = 0;
+			for( size_t f = 0; sameCounts && f < a.frames.size(); ++f )
 			{
-				double px = 0.0;
-				for( size_t i = 0; i < runs[ 0 ].frames[ f ].size(); ++i )
-					px = worse( px, std::fabs( static_cast< double >( runs[ k ].frames[ f ][ i ] ) - runs[ 0 ].frames[ f ][ i ] ) );
-				worstPixel = worse( worstPixel, px );
-				identical += px == 0.0;
-				++compared;
-				for( size_t i = 0; i < runs[ 0 ].places[ f ].size(); ++i )
-				{
-					const V3 d = runs[ k ].places[ f ][ i ] - runs[ 0 ].places[ f ][ i ];
-					worstPlace = worse( worstPlace, std::sqrt( dot( d, d ) ) );
-				}
+				for( size_t i = 0; i < a.frames[ f ].size(); ++i )
+					floats += a.frames[ f ][ i ] != b.frames[ f ][ i ];
+				for( size_t i = 0; i < a.places[ f ].size(); ++i )
+					places += a.places[ f ][ i ].x != b.places[ f ][ i ].x || a.places[ f ][ i ].y != b.places[ f ][ i ].y
+					          || a.places[ f ][ i ].z != b.places[ f ][ i ].z;
+				hashes += a.hashes[ f ] != b.hashes[ f ];
 			}
-			fastest = std::max( { fastest, runs[ k ].fastest, runs[ 0 ].fastest } );
+			for( size_t i = 0; sameCounts && i < a.shakes.size(); ++i )
+				placed = std::max< int64_t >( placed, std::llabs( a.shakes[ i ] - b.shakes[ i ] ) );
+			for( size_t i = 0; sameCounts && i < a.beats.size(); ++i )
+				beat = std::max< int64_t >( beat, std::llabs( a.beats[ i ] - b.beats[ i ] ) );
+			const bool enough = a.frames.size() == 7 && a.shakes.size() == 3 && a.beats.size() >= 9;
+			Check( sameCounts && enough && floats == 0 && places == 0 && hashes == 0 && placed == 0,
+			       fmt( "%dx%d, %g fps against 60: %zu common frames; placed shakes %lld us apart; state differs at %zu, flake centres at %zu, "
+			            "output floats at %zu (want 0, 0, 0, 0)",
+			            raster.w, raster.h, rates[ k ], a.frames.size(), static_cast< long long >( placed ), hashes, places, floats ) );
+			Check( sameCounts && enough && beat <= 2,
+			       fmt( "%dx%d, %g fps against 60: %zu and %zu beat shakes, worst %lld us apart (tolerance 2)", raster.w, raster.h, rates[ k ],
+			            a.beats.size(), b.beats.size(), static_cast< long long >( beat ) ) );
 		}
-		const double placeTol = fastest * 2e-6 + 1e-12;
-		Check( sameCount && !runs[ 0 ].shakes.empty() && worstShake <= 2 && worstPlace <= placeTol && worstPixel <= 0.5 / 255.0,
-		       fmt( "%dx%d: %zu shakes each; instants agree within %lld us (tolerance 2); centres within %.3g m (tolerance %.3g); pixels within %.3g "
-		            "(tolerance %.3g); %d of %d common frames bit-identical",
-		            raster.w, raster.h, runs[ 0 ].shakes.size(), static_cast< long long >( worstShake ), worstPlace, placeTol, worstPixel, 0.5 / 255.0,
-		            identical, compared ) );
 	}
 	return Verdict();
 }
@@ -259,8 +274,8 @@ int runAlpha( const Perturb& perturb )
 int runTriggers( const Perturb& perturb )
 {
 	std::printf( "\n=== triggers: three presses are three full shakes at their frames; at 97 BPM every quarter beat a shake within 2 us of its "
-	             "instant; the harness's music gives one shake per kick, each 0-40 ms after it (earshot's detection; marbling measured 0-26.7 ms), "
-	             "and its hats alone none\n" );
+	             "instant, the plugin's own beat when the host's bar phase stands still; the harness's music gives one shake per kick, 0-26.7 ms "
+	             "after it, and its hats alone none\n" );
 	const Raster raster = kRasters.back();
 	//The button.
 	{
@@ -307,7 +322,30 @@ int runTriggers( const Perturb& perturb )
 		       fmt( "the beat: %zu shakes in %.2f s (%d quarters), worst %lld us from the beat's instant (tolerance 2), at the Shake gain: %s", log.size(),
 		            end, expect, static_cast< long long >( worst ), strengths ? "yes" : "NO" ) );
 	}
-	//Kicks, then hats alone.
+	//A host that never moves its bar phase: the plugin's own beat at its BPM.
+	{
+		Rig rig;
+		if( !startRig( rig, raster.w, raster.h, perturb ) )
+			return 1;
+		rig.Set( PT_TRIGGER_ON, static_cast< float >( TriggerOn::Beat ) );
+		rig.beforeFrame = [ &rig ]( int ) { rig.plugin.SetBeatInfo( static_cast< float >( kOffGridBpm ), 0.0f ); };
+		if( !rig.Render( 300 ) )
+			return 1;
+		const auto& log  = rig.plugin.ShakeLog();
+		const double end = static_cast< double >( rig.plugin.LastFrame().clockUs ) * 1e-6;
+		const int expect = static_cast< int >( std::floor( end * kOffGridBpm / 60.0 ) );
+		int64_t worst    = 0;
+		for( size_t k = 0; k < log.size(); ++k )
+			worst = std::max< int64_t >( worst, std::llabs( log[ k ].us - std::llround( static_cast< double >( k + 1 ) * 60.0 / kOffGridBpm * 1e6 ) ) );
+		Check( static_cast< int >( log.size() ) == expect && worst <= 2,
+		       fmt( "a bar phase stuck at 0: %zu shakes in %.2f s (%d quarters of the plugin's own beat), worst %lld us off (tolerance 2)", log.size(),
+		            end, expect, static_cast< long long >( worst ) ) );
+	}
+	//Kicks, then hats alone. earshot stamps an onset at the end of the first
+	//1024-sample window (21.3 ms) whose flux crosses and analyses whole
+	//256-sample hops (5.3 ms): a shake lands 0 .. 26.7 ms after its kick
+	//(marbling's bound, from the same snapshot).
+	const double late = ( 1024.0 + 256.0 ) / kRate + 1e-6;
 	for( int hats = 0; hats < 2; ++hats )
 	{
 		Rig rig;
@@ -320,30 +358,35 @@ int runTriggers( const Perturb& perturb )
 		const auto& log = rig.plugin.ShakeLog();
 		if( hats )
 		{
-			Check( log.empty(), fmt( "hats alone (no kick): %zu shakes (want none)", log.size() ) );
+			Check( log.empty(), fmt( "hats alone (no kick), 5 s: %zu shakes (want none)", log.size() ) );
 			continue;
 		}
-		const double end = static_cast< double >( rig.plugin.LastFrame().clockUs ) * 1e-6;
-		int matched = 0, stray = 0;
-		double worstLag = 0.0;
-		for( const ShakeRecord& s : log )
+		//The first second warms earshot's thresholds up (marbling's rule).
+		int unmatched = 0, missed = 0, doubled = 0, n = 0;
+		double worst = 0.0;
+		std::vector< int > hits( 16, 0 );
+		for( const ShakeRecord& sr : log )
 		{
-			const double t    = static_cast< double >( s.us ) * 1e-6;
-			const double kick = std::floor( t / 0.5 + 1e-9 ) * 0.5;
-			const double lag  = t - kick;
-			if( lag >= 0.0 && lag <= 0.040 )
-			{
-				++matched;
-				worstLag = std::max( worstLag, lag );
-			}
-			else
-				++stray;
+			const double t = static_cast< double >( sr.us ) * 1e-6;
+			if( t < 1.0 )
+				continue;
+			++n;
+			const int kick   = static_cast< int >( std::floor( t / 0.5 + 1e-9 ) );
+			const double lag = t - kick * 0.5;
+			if( lag < -1e-6 || lag > late )
+				++unmatched;
+			else if( kick < 16 )
+				++hits[ static_cast< size_t >( kick ) ];
+			worst = std::max( worst, lag );
 		}
-		//Kicks at 0, 0.5, ...: the first frame primes, so the kick at 0 may go.
-		const int kicks = static_cast< int >( std::floor( end / 0.5 ) );
-		Check( stray == 0 && matched >= kicks - 1 && matched <= kicks + 1,
-		       fmt( "the music: %zu shakes in %.2f s, %d of them 0-40 ms after a kick (worst %.1f ms), %d stray; %d kicks after the first", log.size(), end,
-		            matched, 1e3 * worstLag, stray, kicks ) );
+		for( int k = 2; k < 10; ++k )
+		{
+			missed += hits[ static_cast< size_t >( k ) ] == 0;
+			doubled += hits[ static_cast< size_t >( k ) ] > 1;
+		}
+		Check( unmatched == 0 && missed == 0 && doubled == 0 && n > 0,
+		       fmt( "the music, 1..5 s: %d shakes; %d outside 0..%.1f ms of a kick, %d of 8 kicks missed, %d doubled; latest %.1f ms after its kick",
+		            n, unmatched, late * 1e3, missed, doubled, worst * 1e3 ) );
 	}
 	return Verdict();
 }

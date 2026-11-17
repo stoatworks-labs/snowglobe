@@ -117,7 +117,22 @@ bool harnessXi( LD rho, LD z, LD n, LD& xi )
 {
 	const LD aMax = std::asin( 1.0L / kD ) * ( 1.0L - 1e-15L );
 	LD hi         = aMax, lo = 0.0L, top = 0.0L, bottom = 0.0L;
-	if( !rhoAt( hi, z, n, top ) || !rhoAt( lo, z, n, bottom ) || rho < bottom || rho > top )
+	//In front of the card (z > 0) the steepest rays enter behind the point's
+	//depth: the bracket ends at the ray whose entry point is at depth z.
+	if( !rhoAt( hi, z, n, top ) )
+	{
+		LD a = 0.0L, b = aMax;
+		for( int k = 0; k < 200; ++k )
+		{
+			const LD mid = 0.5L * ( a + b );
+			LD v         = 0.0L;
+			( rhoAt( mid, z, n, v ) ? a : b ) = mid;
+		}
+		hi = a;
+		if( !rhoAt( hi, z, n, top ) )
+			return false;
+	}
+	if( !rhoAt( lo, z, n, bottom ) || rho < bottom || rho > top )
 		return false;
 	for( int k = 0; k < 200; ++k )
 	{
@@ -273,6 +288,7 @@ int runFall( const Perturb& perturb )
 			const TableRow* row = gpaRow( w );
 			const double nTab   = gpaIndex( w );
 			std::vector< double > discLogR, discLogU, beadLogR, beadLogU;
+			double discFit = 0.0, beadFit = 0.0;//the worst fit error of each set
 			for( Shape shape : { Shape::Flakes, Shape::Beads } )
 			{
 				Rig rig;
@@ -379,18 +395,24 @@ int runFall( const Perturb& perturb )
 						auto& lu = shape == Shape::Beads ? beadLogU : discLogU;
 						lr.push_back( std::log( mine[ k ].r ) );
 						lu.push_back( std::log( -vy ) );
+						( shape == Shape::Beads ? beadFit : discFit ) = worse( shape == Shape::Beads ? beadFit : discFit, fitErr );
 					}
 				}
 			}
-			//The exponents: the viscosity's error is common to every size and
-			//cancels; what is left is the fits'.
+			//The exponents: the viscosity's and density's errors are common to
+			//every size and cancel; what is left is the fits'. Two speeds each
+			//off by at most e move a log-log slope by at most 2e / ln(span of
+			//sizes): that is the tolerance.
 			if( discLogR.size() >= 3 && beadLogR.size() >= 3 )
 			{
 				const double pd = fitSlope( discLogR, discLogU ), pb = fitSlope( beadLogR, beadLogU );
+				const double td = 2.0 * discFit / ( discLogR.back() - discLogR.front() );
+				const double tb = 2.0 * beadFit / ( beadLogR.back() - beadLogR.front() );
 				worstSlopeErr = worse( worstSlopeErr, worse( std::fabs( pd - 1.0 ), std::fabs( pb - 2.0 ) ) );
-				Check( std::fabs( pd - 1.0 ) <= 0.02 && std::fabs( pb - 2.0 ) <= 0.02,
-				       fmt( "%dx%d w %.2f: speed against size, log-log slope %.4f for discs of one film (law 1) and %.4f for beads (law 2), tolerance 0.02",
-				            raster.w, raster.h, w, pd, pb ) );
+				Check( std::fabs( pd - 1.0 ) <= td && std::fabs( pb - 2.0 ) <= tb,
+				       fmt( "%dx%d w %.2f: speed against size, log-log slope %.4f for discs of one film (law 1; tolerance %.4f) and %.4f for beads (law "
+				            "2; tolerance %.4f), from the fits' errors",
+				            raster.w, raster.h, w, pd, td, pb, tb ) );
 			}
 			else
 				Check( false, fmt( "%dx%d w %.2f: too few sizes measured for the exponents", raster.w, raster.h, w ) );
@@ -658,10 +680,36 @@ double hatsOnly( double t )
 	return 0.25 * std::exp( -off / 0.01 ) * ( Hash01( n, 7u, 0u ) - Hash01( n - 1u, 7u, 0u ) );
 }
 
+/// Every flake's state, every bit (FNV-1a), the swirl left out: the fluid
+/// keeps decaying toward rest (flushed below 1e-9 rad/s, minutes later) and
+/// moves nothing that lies on the glass.
+uint64_t flakesHash( const Globe& globe )
+{
+	uint64_t h = 1469598103934665603ull;
+	auto eat   = [ &h ]( const void* data, size_t n ) {
+		const auto* b = static_cast< const unsigned char* >( data );
+		for( size_t i = 0; i < n; ++i )
+		{
+			h ^= b[ i ];
+			h *= 1099511628211ull;
+		}
+	};
+	for( const Flake& f : globe.Flakes() )
+	{
+		eat( &f.x, sizeof f.x );
+		eat( &f.n, sizeof f.n );
+		eat( &f.u, sizeof f.u );
+		const unsigned char rest = f.resting ? 1 : 0;
+		eat( &rest, 1 );
+	}
+	return h;
+}
+
 int runStill( const Perturb& perturb )
 {
 	std::printf( "\n=== still: three seconds of kicks (Trigger On = Kick, the harness's music), then hats with no kick until every flake is at rest, "
-	             "then 300 frames of the same: every output float and the CPU state bit-identical\n" );
+	             "then 300 frames of the same: every output float and every flake's state bit-identical; then 300 more with Shake, Fill, Snow, Size, "
+	             "Range, Count, Globe and Mix moving: not one flake's state changes by a bit\n" );
 	for( const Raster& raster : kRasters )
 	{
 		Rig rig;
@@ -677,8 +725,10 @@ int runStill( const Perturb& perturb )
 			return 1;
 		const size_t shakes = rig.plugin.ShakeLog().size();
 		rig.audio           = hatsOnly;
-		int frames          = 0;
-		while( rig.plugin.LastFrame().suspended > 0 && frames < 60 * 600 )
+		//At most two minutes of hats: the slowest flake here (0.875 mm,
+		//edgewise is faster) falls 1.7 mm/s, so 80 mm takes under a minute.
+		int frames = 0;
+		while( rig.plugin.LastFrame().suspended > 0 && frames < 60 * 120 )
 		{
 			if( !rig.Render( 60 ) )
 				return 1;
@@ -688,7 +738,7 @@ int runStill( const Perturb& perturb )
 		if( !rig.Render( 2 ) )
 			return 1;
 		const Floats first     = rig.Output();
-		const uint64_t hash    = rig.plugin.LastFrame().stateHash;
+		const uint64_t hash    = flakesHash( rig.plugin.GlobeForTest() );
 		const size_t shakesNow = rig.plugin.ShakeLog().size();
 		int differing = 0, hashChanges = 0;
 		for( int f = 0; f < 300; ++f )
@@ -696,7 +746,7 @@ int runStill( const Perturb& perturb )
 			if( !rig.Render( 1 ) )
 				return 1;
 			differing += rig.Output() != first;
-			hashChanges += rig.plugin.LastFrame().stateHash != hash;
+			hashChanges += flakesHash( rig.plugin.GlobeForTest() ) != hash;
 		}
 		const bool noShakes = rig.plugin.ShakeLog().size() == shakesNow;
 		Check( shakes > 0 && rig.plugin.LastFrame().suspended == 0 && differing == 0 && hashChanges == 0 && noShakes && rig.plugin.LastFrame().drawn > 0,
@@ -704,6 +754,23 @@ int runStill( const Perturb& perturb )
 		            "flakes drawn",
 		            raster.w, raster.h, shakes, settledAt, differing, hashChanges, rig.plugin.ShakeLog().size() - shakesNow,
 		            rig.plugin.LastFrame().drawn ) );
+		//The VJ's other controls: the picture may change, the flakes may not.
+		int moved = 0, pictureChanges = 0;
+		for( int f = 0; f < 300; ++f )
+		{
+			const float ramp = static_cast< float >( 0.5 + 0.5 * std::sin( 2.0 * kPi * f / 97.0 ) );
+			for( unsigned int id : { PT_SHAKE, PT_FILL, PT_SIZE, PT_RANGE, PT_COUNT_FLAKES, PT_GLOBE, PT_MIX } )
+				rig.Set( id, ramp );
+			rig.Set( PT_SNOW, static_cast< float >( ( f / 100 ) % 2 ) );
+			if( !rig.Render( 1 ) )
+				return 1;
+			moved += flakesHash( rig.plugin.GlobeForTest() ) != hash;
+			pictureChanges += rig.Output() != first;
+		}
+		Check( moved == 0 && rig.plugin.ShakeLog().size() == shakesNow && pictureChanges > 0,
+		       fmt( "%dx%d: 300 frames with Shake, Fill, Snow, Size, Range, Count, Globe and Mix moving: the state changed on %d (want 0), %zu shakes; "
+		            "the picture changed on %d (so the controls were live)",
+		            raster.w, raster.h, moved, rig.plugin.ShakeLog().size() - shakesNow, pictureChanges ) );
 	}
 	return Verdict();
 }

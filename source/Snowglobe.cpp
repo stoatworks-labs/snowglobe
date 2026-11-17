@@ -29,6 +29,11 @@ constexpr int kBins = 64;
 constexpr int kMaxBeatsPerFrame = 8;
 /// Kicks closer than this on the plugin's clock are one kick.
 constexpr int64_t kKickMergeUs = 50000;
+/// A band-0 onset is a kick only while the band is within 12 dB of the
+/// loudest band (chosen; SPEC-snowglobe.md, Triggers). A hat's splatter into
+/// 40-160 Hz crossed earshot's threshold once the kicks stopped and band 0's
+/// running deviation had decayed: 35 dB under the hat's own band, it fired.
+constexpr float kKickDominance = 0.25f;
 /// Water's n_D at 20 C (GPA Table 23's 0 % row): the kCpuWaterIndex hook.
 constexpr double kWaterIndex = 1.33303;
 
@@ -284,12 +289,16 @@ void SnowglobePlugin::handleKicks( int64_t frameStartUs, int64_t frameUs, std::v
 			bins[ i ] = info->elements[ static_cast< size_t >( i ) ].value;
 	}
 	const earshot::Frame& f = audio.Update( static_cast< double >( frameUs ) * 1e-6, bins, binCount );
+	float loudest = 0.0f;
+	for( int b = 0; b < f.bandCount && b < earshot::kMaxBands; ++b )
+		loudest = std::max( loudest, f.bands[ b ].level );
 	std::vector< int64_t > times;
 	for( int b = 0; b < f.bandCount && b < earshot::kMaxBands; ++b )
 	{
 		const earshot::Band& band = f.bands[ b ];
 		//The first frame primes: counts already standing are not onsets.
-		if( onsetsPrimed && band.onsetCount != lastOnsetCount[ b ] && ( b == kKickBand || ( cpuHooks & kCpuAnyBand ) ) )
+		const bool dominant = band.level >= kKickDominance * loudest || ( cpuHooks & kCpuNoDominance );
+		if( onsetsPrimed && band.onsetCount != lastOnsetCount[ b ] && ( ( b == kKickBand && dominant ) || ( cpuHooks & kCpuAnyBand ) ) )
 		{
 			int64_t at = frameUs;
 			if( f.source != earshot::Source::Host && !( cpuHooks & kCpuEventsAtFrame ) && band.lastOnsetTime >= 0.0 )
@@ -405,19 +414,33 @@ void SnowglobePlugin::buildFlakes( const Physics& p, int width, int height, doub
 		if( !pr.seen )
 			continue;
 		const double r = globe.RadiusOf( i, p ) / kRadius;
-		V3 e1{ 1.0, 0.0, 0.0 }, e2{ 0.0, 1.0, 0.0 };
-		if( p.shape == Shape::Flakes )
-			planeOf( flakes[ static_cast< size_t >( i ) ].n, e1, e2 );
-		double M[ 2 ][ 2 ];
-		const V3 axes[ 2 ] = { e1, e2 };
-		for( int k = 0; k < 2; ++k )
-			for( int row = 0; row < 2; ++row )
-				M[ row ][ k ] = scale * r * ( pr.J[ row ][ 0 ] * axes[ k ].x + pr.J[ row ][ 1 ] * axes[ k ].y + pr.J[ row ][ 2 ] * axes[ k ].z );
-		//M M^T = [[a, b], [b, c]]: the ellipse's semi-axes are its
+		//The image is {M v : |v| <= 1}: for a disc M is the Jacobian on the
+		//disc's plane (2 x 2), for a bead the whole Jacobian (2 x 3), whose
+		//outline is the bead's silhouette to first order. Either way
+		//M M^T = [[a, b], [b, c]], and the ellipse's semi-axes are its
 		//eigenvectors, scaled by the square roots of its eigenvalues.
-		const double a = M[ 0 ][ 0 ] * M[ 0 ][ 0 ] + M[ 0 ][ 1 ] * M[ 0 ][ 1 ];
-		const double b = M[ 0 ][ 0 ] * M[ 1 ][ 0 ] + M[ 0 ][ 1 ] * M[ 1 ][ 1 ];
-		const double c = M[ 1 ][ 0 ] * M[ 1 ][ 0 ] + M[ 1 ][ 1 ] * M[ 1 ][ 1 ];
+		double a = 0.0, b = 0.0, c = 0.0;
+		const double sr = scale * r;
+		if( p.shape == Shape::Flakes )
+		{
+			V3 e1{ 1.0, 0.0, 0.0 }, e2{ 0.0, 1.0, 0.0 };
+			planeOf( flakes[ static_cast< size_t >( i ) ].n, e1, e2 );
+			const V3 axes[ 2 ] = { e1, e2 };
+			double M[ 2 ][ 2 ];
+			for( int k = 0; k < 2; ++k )
+				for( int row = 0; row < 2; ++row )
+					M[ row ][ k ] = sr * ( pr.J[ row ][ 0 ] * axes[ k ].x + pr.J[ row ][ 1 ] * axes[ k ].y + pr.J[ row ][ 2 ] * axes[ k ].z );
+			a = M[ 0 ][ 0 ] * M[ 0 ][ 0 ] + M[ 0 ][ 1 ] * M[ 0 ][ 1 ];
+			b = M[ 0 ][ 0 ] * M[ 1 ][ 0 ] + M[ 0 ][ 1 ] * M[ 1 ][ 1 ];
+			c = M[ 1 ][ 0 ] * M[ 1 ][ 0 ] + M[ 1 ][ 1 ] * M[ 1 ][ 1 ];
+		}
+		else
+			for( int k = 0; k < 3; ++k )
+			{
+				a += sr * sr * pr.J[ 0 ][ k ] * pr.J[ 0 ][ k ];
+				b += sr * sr * pr.J[ 0 ][ k ] * pr.J[ 1 ][ k ];
+				c += sr * sr * pr.J[ 1 ][ k ] * pr.J[ 1 ][ k ];
+			}
 		const double h = 0.5 * ( a - c );
 		const double q = std::sqrt( h * h + b * b );
 		const double l1 = std::max( 0.5 * ( a + c ) + q, 0.0 ), l2 = std::max( 0.5 * ( a + c ) - q, 0.0 );
@@ -445,10 +468,13 @@ void SnowglobePlugin::buildFlakes( const Physics& p, int width, int height, doub
 		d.a1y    = w1 * uy;
 		d.a2x    = -w2 * uy;
 		d.a2y    = w2 * ux;
-		//The edge ramp adds pi/12 px^2 to any convex shape (Steiner: the
-		//parallel curves at +-0.5 px), so the coverage that integrates to the
-		//true area pi s1 s2 is this.
-		d.alpha  = ( s1 * s2 ) / ( w1 * w2 + 1.0 / 12.0 );
+		//The shader's coverage is clamp(0.5 - (r - 1) / |grad r|) with r the
+		//ellipse's own radius (|grad r| depends on the direction alone), and
+		//it integrates in closed form to pi w1 w2 + (pi / 24)(w1/w2 + w2/w1)
+		//(pi/12 for a circle, as Steiner's parallel curves give); the shader
+		//box-filters it over each pixel, so the coverage that sums to the
+		//true area pi s1 s2 is this (AGENTS.md, "Flake coverage").
+		d.alpha  = ( s1 * s2 ) / ( w1 * w2 + ( w1 / w2 + w2 / w1 ) / 24.0 );
 		d.behind = P[ 2 ] < 0.0;
 		drawn.push_back( d );
 	}
@@ -490,6 +516,7 @@ void SnowglobePlugin::drawFlakes( int first, int count, int width, int height )
 	uniform( flakeShader, "Hooks", hooks );
 	glUniform4i( where( flakeShader, "Viewport" ), 0, 0, width, height );
 	glUniform2f( where( flakeShader, "Size" ), static_cast< float >( width ), static_cast< float >( height ) );
+	uniform( flakeShader, "GlobePx", static_cast< float >( frame.globePx ) );
 	glBindVertexArray( flakeVao );
 	glBindBuffer( GL_ARRAY_BUFFER, flakeVbo );
 	glBufferSubData( GL_ARRAY_BUFFER, 0, static_cast< GLsizeiptr >( count * 8 * sizeof( float ) ), &instances[ static_cast< size_t >( first ) * 8 ] );

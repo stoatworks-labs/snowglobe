@@ -28,7 +28,8 @@ enum CpuHook : int
 	kCpuWaterIndex      = 1 << 5,///< the scene refracts with water's n, whatever the fill
 	kCpuFlakesStraight  = 1 << 6,///< flakes projected without refraction
 	kCpuAnyBand         = 1 << 7,///< a kick from any band, not the lowest
-	kCpuDropPresses     = 1 << 8 ///< presses between two frames collapse to one
+	kCpuDropPresses     = 1 << 8,///< presses between two frames collapse to one
+	kCpuNoDominance     = 1 << 9 ///< a band-0 onset is a kick whatever the other bands carry
 };
 
 /// Kicks are earshot onsets in this band only (40-160 Hz).

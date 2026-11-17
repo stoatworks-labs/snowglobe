@@ -254,7 +254,7 @@ int runRobust( const Perturb& perturb )
 				for( unsigned int id : { PT_SHAKE, PT_FILL, PT_SIZE, PT_RANGE, PT_COUNT_FLAKES, PT_GLOBE, PT_MIX } )
 					rig.Set( id, end );
 				int presses = 0, nonFinite = 0, outOfRange = 0;
-				double outside = 0.0;
+				double outside = -kRadius;//the furthest centre past the glass (negative: inside)
 				for( int f = 0; f < 240; ++f )
 				{
 					const bool down = f % 2 == 0;

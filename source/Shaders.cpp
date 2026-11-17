@@ -149,21 +149,43 @@ const char* const kFlakeFragment = R"(
 flat in vec4 axisA;
 flat in vec4 axisB;
 
+uniform float GlobePx;//the silhouette's radius, px: nothing inside the glass shows outside it
+
+//The coverage at a point: one-pixel ramp across the ellipse's edge, the
+//distance taken as (r - 1) / |grad r| with r the ellipse's own radius.
+float coverAt( vec2 rel, vec2 a1, vec2 a2, float l1, float l2 )
+{
+	vec2 q  = vec2( dot( rel, a1 ) / l1, dot( rel, a2 ) / l2 );
+	float r = length( q );
+	if( hook( kHookHardEdge ) )
+		return step( r, 1.0 );
+	vec2 g  = ( q.x / max( r, 1e-6 ) ) * a1 / l1 + ( q.y / max( r, 1e-6 ) ) * a2 / l2;
+	float d = ( r - 1.0 ) / max( length( g ), 1e-6 );
+	return clamp( 0.5 - d, 0.0, 1.0 );
+}
+
 void main()
 {
 	vec2 a1  = axisA.zw;
 	vec2 a2  = axisB.xy;
-	//The semi-axes are orthogonal (the CPU's SVD): q in the ellipse's frame.
-	vec2 rel = centred() - axisA.xy;
+	//The semi-axes are orthogonal (the CPU's SVD).
+	vec2 P   = centred();
+	vec2 rel = P - axisA.xy;
 	float l1 = max( dot( a1, a1 ), 1e-12 );
 	float l2 = max( dot( a2, a2 ), 1e-12 );
-	vec2 q   = vec2( dot( rel, a1 ) / l1, dot( rel, a2 ) / l2 );
-	float r  = length( q );
-	//|q|'s gradient in px, for a one-pixel ramp across the edge.
-	vec2 g   = ( q.x / max( r, 1e-6 ) ) * a1 / l1 + ( q.y / max( r, 1e-6 ) ) * a2 / l2;
-	float d  = ( r - 1.0 ) / max( length( g ), 1e-6 );
-	float cover = hook( kHookHardEdge ) ? step( r, 1.0 ) : clamp( 0.5 - d, 0.0, 1.0 );
-	fragColour  = vec4( cover * axisB.z );
+	//Box-filtered over the pixel by a 4 x 4 midpoint rule, so the pixels sum
+	//to the coverage's integral, wherever the flake sits on the lattice; a
+	//subsample past the silhouette sees no flake (the ellipse is the
+	//projection's first order, and at the rim it overhangs).
+	float cover = 0.0;
+	for( int j = 0; j < 4; ++j )
+		for( int i = 0; i < 4; ++i )
+		{
+			vec2 o = vec2( float( i ) - 1.5, float( j ) - 1.5 ) * 0.25;
+			if( dot( P + o, P + o ) <= GlobePx * GlobePx )
+				cover += coverAt( rel + o, a1, a2, l1, l2 );
+		}
+	fragColour = vec4( cover * ( axisB.z / 16.0 ) );
 }
 )";
 
@@ -188,7 +210,8 @@ void main()
 	vec4 s     = clamp( raw, 0.0, 1.0 );
 	vec4 srcP  = hook( kHookNoPremultiply ) ? s : vec4( s.rgb * s.a, s.a );
 	vec4 o     = mix( srcP, clamp( g, 0.0, 1.0 ), clamp( MixAmount, 0.0, 1.0 ) );
-	fragColour = o.a > 0.0 ? vec4( o.rgb / o.a, o.a ) : vec4( 0.0 );
+	//Clamped: the blend's rounding can leave a colour an ulp above its alpha.
+	fragColour = o.a > 0.0 ? clamp( vec4( o.rgb / o.a, o.a ), 0.0, 1.0 ) : vec4( 0.0 );
 }
 )";
 

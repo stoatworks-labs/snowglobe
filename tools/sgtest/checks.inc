@@ -63,6 +63,7 @@ int runNegative( bool offlineOnly = false, const std::string& only = "" )
 	add( "swirl", "the swirl decays with k = pi / R, not x1 / R", 0, 0, kPhysWrongMode, 0 );
 	add( "still", "resting flakes slide down the glass", 0, 0, kPhysSliding, 0 );
 	add( "still", "a kick from any band: the hats shake it", 0, kCpuAnyBand, 0, 0 );
+	add( "still", "a band-0 onset a kick whatever the other bands carry", 0, kCpuNoDominance, 0, 0 );
 	add( "grid", "the scene not refracted at the glass", kHookNoRefract, 0, 0, 0 );
 	add( "grid", "the scene refracted with water's n, whatever the fill", 0, kCpuWaterIndex, 0, 0 );
 	add( "magnify", "the scene refracted with water's n, whatever the fill", 0, kCpuWaterIndex, 0, 0 );
@@ -74,6 +75,7 @@ int runNegative( bool offlineOnly = false, const std::string& only = "" )
 	add( "alpha", "the clip sampled straight, not premultiplied", kHookNoPremultiply, 0, 0, 0 );
 	add( "triggers", "beats and kicks placed at the frame, not inside it", 0, kCpuEventsAtFrame, 0, 0 );
 	add( "triggers", "a kick from any band, not the lowest", 0, kCpuAnyBand, 0, 0 );
+	add( "triggers", "a band-0 onset a kick whatever the other bands carry", 0, kCpuNoDominance, 0, 0 );
 	add( "coreaudio", "the device menu listed and Audio Input applied whatever Trigger On says", 0, kCpuIgnoreGate, 0, 0 );
 	add( "glstate", "the composite leaves its program and textures bound", 0, kCpuLeakState, 0, 0 );
 	add( "robust", "presses between two frames collapse to one", 0, kCpuDropPresses, 0, 0 );

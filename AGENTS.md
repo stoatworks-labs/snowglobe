@@ -8,7 +8,13 @@ departs from it).
 
 ## Status
 
-**v0.1.0, local only, 2026-11-17.** VERIFY_STATUS **Never loaded into Resolume; no live
+**v0.1.0, local only, 2026-11-17.** `OXBOW=… TMPDIR=… tools/verify.sh` passes on this
+Mac (Apple Silicon) against a fresh universal Release build: 102 checks at 1280x720 and
+320x180, every picture check again on Apple's software renderer at 320x180, `--offline` with
+no GL context, the box rule against `--flakes`' tolerances, Arena's two DXV alpha clips and the
+defaults' measurement through `--pipe`, the pipe, 27 of 27 negative controls, 46 of 46
+mutants, 10 of 10 controls alive in the sweep and in the bare sweep, oxbow reading and
+rendering the bundle with devices disabled. **Never loaded into Resolume; no live
 audio device ever opened.** Never built on Windows. No remote, nothing released, not on the
 website. earshot is a snapshot of `~/dev/earshot` at `8124191`, unpatched. No OpenFX port, no
 browser demo, no user guide.
@@ -129,7 +135,24 @@ derivation of it.
 
 ## Cost
 
-COST_TABLE
+`sgtest --bench` in the verify.sh run of 2026-11-17 (this Mac's GPU, Apple Silicon, shared with
+other builds; load average about 15–20 throughout, so these wander between runs). Each frame
+timed alone: glFinish before and after, GL_TIME_ELAPSED for the GPU, the thread's CPU clock
+inside ProcessOpenGL, and wall time; median and worst of 120 frames after 240 of warm-up;
+every timed frame checked to have rendered (0 did not).
+
+| case | raster | GPU median | GPU worst | CPU median | wall median |
+| --- | --- | --- | --- | --- | --- |
+| defaults (600 flakes), kicks from the music | 720p | 0.341 ms (2.0% of a 60 fps frame) | 0.597 ms | 1.149 ms | 1.639 ms |
+| defaults (600 flakes), kicks from the music | 1080p | 0.680 ms (4.1%) | 0.879 ms | 1.160 ms | 2.118 ms |
+| 3000 flakes (the cap), 1.25 mm, Globe 1.0, a full shake each second | 720p | 1.272 ms (7.6%) | 1.585 ms | 2.155 ms | 3.753 ms |
+| 3000 flakes (the cap), 1.25 mm, Globe 1.0, a full shake each second | 1080p | 1.248 ms (7.5%) | 2.885 ms | 2.168 ms | 3.800 ms |
+
+The CPU side (the physics, 3000 flakes' projections and the instance upload) is about 1.15 ms
+at the defaults and 2.2 ms at the cap, whatever the raster. The cap's GPU median at 1080p came
+out no higher than at 720p in this run (an earlier run the same day: 1.228 and 0.925 ms), which
+is the machine's load, not a property: read the cap's GPU cost as 1–1.3 ms. Not measured: 4K
+(the brief says no 4K loops on this shared Mac).
 
 ## The traps actually hit
 
@@ -202,7 +225,33 @@ alpha centroids and converted through the harness's own trace, so tolerances com
 fit or the float trace, not from a pixel count. One line per check (software = Apple's
 renderer at 320x180, run by verify.sh):
 
-SOFTWARE_LINES
+- `--fall`: Cheng's 3.5 % + Volk's 0.07 % + three standard errors of the fit, relative to the
+  law. Positions are alpha centroids through the harness's trace. Software: passes, the same
+  speeds to four figures (−0.84 %, −2.30 %), bead slope 1.9980 (tolerance 0.0036).
+- `--settle`: Cheng's 3.5 % + two frames. Software: passes, 25.429 s.
+- `--swirl`: decay as `--fall`; the ratio three standard errors of the windows; the full
+  shake three standard errors of two cubic fits. Software: passes (2.0031 rad/s, +0.155 %
+  against 0.873 %).
+- `--still`: bit-exact, a CPU state and output floats compared within one run on one renderer.
+  Software: passes (twice, both times under a load average near 20, though the brief warns the
+  software renderer is not always bit-identical under load).
+- `--grid`: the shader's float trace against the harness's double trace through the same
+  finder, 1e-3 px (a few ulp of float times the card's pixels per R). Software: passes, worst
+  3.3e-5 px; the GPU at 320x180 3.2e-5 px.
+- `--magnify`: 0.2 px over the measured separation (the line finder's sub-pixel reach), against
+  the trace at that separation. Software: passes, the GPU's numbers to five figures.
+- `--flakes`: the box rule's worst error over 6000 ellipses (`tools/coverage.py`), which does
+  not depend on the rasteriser because coverage is computed in the fragment shader. Software:
+  passes, 0.0043 px and 0.16 %, as the GPU.
+- `--rate`, `--clock`, `--resize`: bit-exact within one renderer. Software: pass.
+- `--alpha`: bit-exact through texelFetch; the silhouette's radius within 1 px (the edge band).
+  Software: passes, 81.010 px.
+- `--triggers`: event times on the CPU in double, read from the plugin's log: no rasteriser.
+  Software: passes.
+- `--glstate`: GL queries. Software: passes.
+- `--robust`: finite, in range, inside the glass, at 320x180 and 97x61. Software: passes.
+- `--coreaudio`: a process-level interposer (DYLD_INSERT_LIBRARIES): macOS only; GPU run only.
+- `--model`, `--names`, `--cues`: no GL; run by `--offline`.
 
 ## The negative controls and mutants
 

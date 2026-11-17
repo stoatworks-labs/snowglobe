@@ -1,0 +1,324 @@
+# AGENTS.md: Snowglobe
+
+Read this before changing the fill, the flakes' mobility, the swirl or the shake, the
+projection of flakes, the scene trace, the flake coverage, the event times, the clock or the
+device gate. `CLAUDE.md` has the commands; the spec is
+`~/Projects/resolume/specs/SPEC-snowglobe.md` (its As built section records where this repo
+departs from it).
+
+## Status
+
+**v0.1.0, local only, 2026-11-17.** VERIFY_STATUS **Never loaded into Resolume; no live
+audio device ever opened.** Never built on Windows. No remote, nothing released, not on the
+website. earshot is a snapshot of `~/dev/earshot` at `8124191`, unpatched. No OpenFX port, no
+browser demo, no user guide.
+
+## The idea
+
+**A snow globe is a slow, viscous, settling flow seen through one curved surface.** The clip
+is a card standing at the centre of a sphere of water and glycerol. White flakes cut from PET
+film fall through the fill at the speed low-Reynolds-number drag allows them, a shake sets the
+fill turning in its slowest mode, which dies away viscously, and a flake that reaches the
+glass lies there until the next shake. The viewer looks at it all through the one surface
+between the fill and the air, which magnifies the middle of the card by the fill's n and
+squeezes its rim. Every one of those numbers comes from a table or a fit someone else
+published, and the harness measures each off the rendered pixels.
+
+## What the literature settled (the spec has the sources and the claim-by-claim table)
+
+- **"Settling at their Stokes terminal velocity … as r²" holds for spheres only.** Real flakes
+  are flat: a thin disc falls at F/(16μa) broadside and F/((32/3)μa) edgewise ([Katz],
+  [Tomita]), and a disc cut from one film weighs ∝ a², so it falls ∝ a. The plugin has both
+  shapes (Snow = Flakes or Beads); `--fall` measures the exponent 1 for discs and 2 for beads.
+- **"As a ball lens" is not what it is.** The scene is inside the water, so there is one
+  refracting surface; an object at the centre appears at the centre magnified by n ([OpenStax]
+  eq. 2.11; [Y&F]'s fish bowl). The thin glass wall changes where a ray enters, not where it
+  goes (the spec shows why), so it is left out.
+- **The fill's numbers** are the GPA's tables (density, Segur & Oberstar's viscosity, Hoyt's
+  index), [Cheng]'s viscosity formula and [Volk]'s density model. The physics checks measure
+  against the tables; the plugin uses the fits. Fill spans w = 0.60–0.80 because below 0.60
+  the largest discs pass Re 1 and leave Stokes.
+- **"Seconds to settle" is the fall, not the fluid.** A flake's response time is under 3 ms, so
+  it moves at the fluid's velocity plus its settling velocity; the swirl dies in τ = R²/(x1²ν)
+  (8.4 s at w = 0.60); settling takes tens of seconds at the defaults, as real globes do. No
+  water-glycerol fill settles mm flakes over 80 mm in a few seconds while staying in Stokes.
+- Not read: Happel & Brenner and Lamb (the disc drags are taken from [Katz] and [Tomita],
+  which cite them), Hecht's *Optics*, the Smithsonian's Perzy article (403), Anton Paar's page
+  (behind a bot check, not bypassed). No source gives a globe's usual size, viewing distance
+  or a maker's fill fraction.
+
+## Decisions taken without asking (the brief says decide and write it down)
+
+- **Identity.** `SW Snowglobe`, `SG01`, effect, `com.stoatworks.ffgl.snowglobe`, harness
+  `sgtest`.
+- **Geometry (chosen).** Inner radius R = 40 mm; the viewer a pinhole at D = 10R; the card the
+  disc z = 0 with the clip's height across the diameter; the silhouette's diameter Globe ×
+  the frame's height.
+- **State on the CPU in double, not the GPU** (spec, State): the "nothing moves" and frame-rate
+  claims are bit-exact, the counts are at most 3000, and the harness can read the state.
+  Counter-based seeds (SplitMix64 of the flake and the shake's sequence number) so a run
+  replays exactly and the n-th shake lifts the same flakes the same way at any frame rate.
+- **Time.** Integer microseconds from the first frame; RK4 on an 8 ms grid; an event splits the
+  step it lands in at its microsecond; a frame draws the state advanced from the last grid
+  point by one partial step that is not stored. The host's clock is voted seconds or
+  milliseconds against the wall clock (marbling's), so 499 million ms is only an offset.
+- **The swirl is one vector.** Only the slowest toroidal mode, u = f(r)(W × x),
+  f = 3j1(kr)/(kr), k = x1/R, decaying at νk²: every other mode of the sphere decays at least
+  1.65 times faster. A shake adds S·Ω_max along a seeded horizontal axis, Ω_max = 2 rad/s
+  (chosen).
+- **The shake (chosen; no source models a hand)** lifts every *resting* flake straight up by a
+  seeded height in [0, 2R·S] (clipped inside the glass) with a new seeded orientation, and adds
+  to the swirl. A flake already in suspension is moved only by the swirl.
+- **A flake at rest is pinned** until a shake: no sliding down the glass. That is what makes
+  `--still` bit-exact, and it is the claim the brief asks for.
+- **Kicks.** An earshot onset in band 0 (40–160 Hz) is a kick only while band 0's level is at
+  least **0.25 of the loudest band's** (`kKickDominance`, chosen). Without that gate the hats'
+  low-frequency splatter fired band 0 once the kicks stopped (band-0 level 3.9e-4 against band
+  3's 0.022), and the globe never stayed still on hats. Kicks within 50 ms are one. Each is
+  placed at hostNow − (audioTime − lastOnsetTime), clamped inside the frame.
+- **Beat.** Each quarter of the bar is a shake at Shake's strength, the crossing interpolated
+  inside the frame (ferrofluid's, by way of marbling); a bar phase that never moves gets the
+  plugin's own clock at the last BPM.
+- **The button (Shake Now) is a full shake, S = 1, under every Trigger On.**
+- **Alpha.** The clip is filtered by hand, premultiplied, four texels (mirrorball's trap: a
+  host bilinear on straight alpha bleeds colour). Where the card is transparent, the output is
+  transparent (the ray is let out unrefracted; flakes behind the card show through); outside
+  the globe the output is transparent, so the globe stands over the layers below. Mix is a
+  premultiplied mix with the clip; Mix 0 returns the clip by texelFetch, bit for bit.
+- **Flakes drawn as instanced quads**, never points (Apple's GL rounds point sizes). Each is an
+  ellipse from the projection's Jacobian (discs: the disc's own plane; beads: the full 2×3
+  Jacobian, J Jᵀ), semi-axes at least half a pixel, coverage a one-pixel ramp box-filtered by a
+  4×4 midpoint rule per pixel, scaled on the CPU by the ramp's exact integral
+  s1·s2 / (w1·w2 + (w1/w2 + w2/w1)/24), and clipped to the silhouette. In three layers: behind
+  the card, the card, in front.
+- **Resize.** The state is in metres; a resize changes only the drawing. `--resize` requires the
+  state and the last frame to be identical to a run at the new size throughout.
+- **Count lower, then higher.** Flakes past the count are neither stepped nor drawn; when the
+  count rises they come back where they were, at rest or in mid-fall.
+- **Size and Range move no resting flake.** A flake that grows while at rest pokes up to the
+  difference in radius past the glass until the next shake (it is clipped to the silhouette in
+  the picture). `--robust` checks every flake inside the glass at fixed controls only.
+- **The device gate.** CoreAudio is touched only when Trigger On is Kick and
+  `SNOWGLOBE_NO_DEVICES` is unset; the device menu is listed on the first frame that needs it,
+  never in the constructor. earshot's CMake links CoreAudio, AudioToolbox and CoreFoundation at
+  load time, so the claim is "nothing calls into them or loads them by name", not "not linked".
+- **No `.github/workflows/`.** The repo has no remote; Actions are for public repos only on
+  this machine.
+
+## Defaults
+
+All chosen (the spec's table): Shake 0.3, Trigger On Kick, Audio Input Resolume FFT, Fill 0
+(w = 0.60, the fastest fill Stokes allows), Snow Flakes, Size a = 1.0 mm, Range 0.5, Count
+600, Globe 0.9, Mix 1. No source gives a globe's flake count or a VJ's shake.
+
+**What the demo clips measure of them** (`tools/clips.py defaults`, every one of the 33 `.mov`s
+under `/Applications/Resolume Arena/media`, one frame held still at 320x180, a full shake, read
+1.5 s later against the same clip with no shake; the snow found on an opaque black card, since
+the snow's state never depends on the clip):
+
+| Count | the snow covers (mean over the globe) | its contrast over the clip, median of 33 clips | worst clip | clips under 0.1 |
+| --- | --- | --- | --- | --- |
+| 150 | 1.29 % | 0.722 | 0.474 | 0 |
+| **600 (default)** | **5.28 %** | **0.752** | **0.455** | **0** |
+| 2400 | 20.24 % | 0.800 | 0.450 | 0 |
+
+Contrast is the luminance step (0..1) the snow adds on pixels it covers at least half. White
+snow stays visible on every demo clip at every count tried; at the default it covers about a
+twentieth of the globe, leaving the clip readable. That is a reading of the choice, not a
+derivation of it.
+
+## Cost
+
+COST_TABLE
+
+## The traps actually hit
+
+- **The fall check measured nothing in front of the card.** The harness's inverse trace
+  (`harnessXi`) bisected over the whole angular range, and for a point at z > 0 the grazing ray
+  enters behind it, so the bracket failed. It now bisects for the largest angle whose ray
+  still reaches z first.
+- **Hats fired kicks.** earshot's band-0 detector rose on the hats' low splatter once the kicks
+  stopped, so `--still` never saw a still globe: the dominance gate above.
+- **The swirl keeps decaying after every flake has landed** (until |W| < 1e-9 rad/s), so a
+  bit-exact "state unchanged" over the whole globe failed while no flake moved. `--still`
+  compares every flake's state and every output float; the swirl is the fluid, not the snow.
+- **A centroid finder has a bias of its own.** Grid crossings found in the plugin's picture
+  were 0.15–0.3 px from the trace's analytic crossings, the finder's bias on a line drawn
+  through refraction, not the plugin's error. `--grid` now renders the harness's own traced
+  picture and runs the same finder on both: they agree to 1.2e-4 px, and the finder's bias is
+  reported beside it.
+- **Asking for 100 grid crossings** inside 0.8 of the silhouette when the grid has 69 there.
+- **Flake areas 10.7 % off at 320x180.** Point-sampling the ramp on the pixel lattice, and an
+  area correction that is exact only for circles: now the 4×4 box rule and the ramp's integral
+  for any ellipse (`tools/coverage.py`: worst 0.84 %, 0.032 px over 6000 ellipses). Beads use
+  the full 2×3 Jacobian, not one in-plane pair.
+- **Flakes overhung the silhouette**: 55 pixels outside the globe not clear. Subsamples past
+  the silhouette are now clipped.
+- **Blending rounded output floats a hair outside 0..1** (`--robust`): the composite clamps.
+- **GPA Table 4 is printed every 10 %**: rows at 65 % and 75 % had been put in the harness's
+  density table from memory. Removed; the viscosity table (Table 17) keeps its six printed rows.
+- **A quadratic fit hid the spin.** The full shake's spin measured +1.1 % with a quadratic over
+  0.2 s: the tracer turns 0.33 rad on its circle, and the cubic term leaks (ωT)²/10 into the
+  slope. A cubic fit over 0.1 s at 240 fps gives 2.0001 rad/s.
+- **A tolerance that grew when the measurement was wrong.** The fall and swirl tolerances
+  divided a fit's residual by the *measured* span: a swirl that never decayed got a 5300 %
+  tolerance and the mutant "decay ν, not νk²" passed. Both are now three standard errors of
+  the slope relative to the *law's* value.
+- **A check read the plugin's own figure.** `--alpha` placed the silhouette at the plugin's
+  globePx, so a mutant making the globe a fifth larger passed. It now takes 0.45 H from the
+  spec and also measures the radius off the alpha (324.012 px against 324).
+- **A citation from memory in the harness.** `--model` said "Hecht's paraxial n"; Hecht was
+  never reached. Now OpenStax eq. 2.11.
+- **On arm64, long double is double.** The harness's trace "in long double" is double here; its
+  tolerances are written for double.
+- The machine's: heredocs hang without TMPDIR (verify.sh refuses to run without one); no
+  `timeout` (perl alarm); `head`, `grep` and `cc` shadowed (`/usr/bin/head`, `command grep`);
+  ffmpeg needs `-nostdin`; the load average sat near 20 for most of the build, so the bench
+  numbers wander.
+
+## Verified, and assumed
+
+Verified, by `tools/verify.sh` on 17 November 2026: every claim in README's Status, at
+1280x720 and 320x180 on this Mac's GPU, every picture check again on Apple's software renderer
+at 320x180; the CPU checks with no GL context; the alpha check on Arena's DXV clips; the
+negative controls and mutants; the sweep, and `--bare`; the bundle universal, signed ad hoc,
+read and rendered by oxbow.
+
+Assumed: Stokes drag (Re → 0) up to Re 0.63 at the worst corner, where [Mercier]'s correlation,
+extrapolated below its range, puts the true drag ~10 % higher; discs that keep their
+orientation; the slowest mode only, linear; the shake (Ω_max, the lift); the geometry (R, D,
+the card at the centre); 20 °C; n at the sodium D line; Resolume's FFT onsets usable
+(earshot's host fallback is frame-quantised and uncalibrated).
+
+Not done: loading it into Resolume; a live device; a Windows build; a user guide, presets, an
+OpenFX port, a browser demo; a 4K bench.
+
+## Would this hold on another rasteriser, at another raster?
+
+The scene shader reads the clip by texelFetch with the bilinear done by hand, traces with
+algebra and sqrt only, and averages four rays a pixel; flakes are quads whose coverage is
+computed in the fragment shader, not by the rasteriser's coverage. Positions are measured by
+alpha centroids and converted through the harness's own trace, so tolerances come from the
+fit or the float trace, not from a pixel count. One line per check (software = Apple's
+renderer at 320x180, run by verify.sh):
+
+SOFTWARE_LINES
+
+## The negative controls and mutants
+
+`sgtest --negative`, 27 wrong models, each must fail its check; a check with none fails:
+
+| check | wrong model |
+| --- | --- |
+| `--fall` | discs fall at their equal-volume sphere's Stokes speed |
+| `--fall` | settling speeds from water's viscosity, whatever the fill |
+| `--settle` | settling speeds from water's viscosity, whatever the fill |
+| `--swirl` | the swirl decays with k = π/R, not x1/R |
+| `--still` | resting flakes slide down the glass |
+| `--still` | a kick from any band: the hats shake it |
+| `--still` | a band-0 onset a kick whatever the other bands carry |
+| `--grid` | the scene not refracted at the glass |
+| `--grid` | the scene refracted with water's n, whatever the fill |
+| `--magnify` | the scene refracted with water's n, whatever the fill |
+| `--flakes` | flakes projected without the glass's refraction |
+| `--flakes` | flakes drawn with hard edges, no coverage |
+| `--rate` | beats and placed shakes at the frame, not inside it |
+| `--clock` | the host's clock read through a float |
+| `--resize` | a resize starts the globe again |
+| `--alpha` | the clip sampled straight, not premultiplied |
+| `--triggers` | beats and kicks placed at the frame, not inside it |
+| `--triggers` | a kick from any band, not the lowest |
+| `--triggers` | a band-0 onset a kick whatever the other bands carry |
+| `--coreaudio` | the device menu listed and Audio Input applied whatever Trigger On says |
+| `--glstate` | the composite leaves its program and textures bound |
+| `--robust` | presses between two frames collapse to one |
+| `--model` | the fill's viscosity at 25 °C, not 20 °C |
+| `--model` | water's index, whatever the fill |
+| `--model` | the swirl mode held to k = π/R |
+| `--names` | a seventeen-character name added |
+| `--cues` | every control ramped between keys |
+
+`tools/mutate.sh`, 46 one-character mutants of the shipped code (21 in the GLSL), each caught.
+One arm64 tree; before each mutant the object and the sgtest binary are deleted, and the
+mutant is proved in the build (the object differs from the unmutated one; a GLSL mutant's text
+is in the binary); every named check must pass unmutated first; 320x180; perl alarm 300 s (a
+timeout counts as caught, and is said; none timed out):
+
+| file | mutant | caught by |
+| --- | --- | --- |
+| Shaders.cpp (GLSL) | the silhouette's discriminant 1 + D^2 x^2 / L^2, - -> + | `--grid` |
+| Shaders.cpp (GLSL) | the ray meeting the glass where it leaves, not where it enters, - -> + | `--grid` |
+| Shaders.cpp (GLSL) | the entry point's depth with the root subtracted, + -> - | `--grid` |
+| Shaders.cpp (GLSL) | the index ratio 2 / n, 1 -> 2 | `--magnify` |
+| Shaders.cpp (GLSL) | Snell's cosine term 1 + eta^2 (1 - c^2), - -> + | `--grid` |
+| Shaders.cpp (GLSL) | the refracted ray's normal part with the wrong sign, - -> + | `--grid` |
+| Shaders.cpp (GLSL) | the ray walked away from the card, + -> - | `--grid` |
+| Shaders.cpp (GLSL) | the card's width read as 3 aspect, 2 -> 3 | `--grid` |
+| Shaders.cpp (GLSL) | the card read a texel off, - -> + | `--grid` |
+| Shaders.cpp (GLSL) | the card's upper row weighted by y, x -> y | `--grid` |
+| Shaders.cpp (GLSL) | the card premultiplied by adding its alpha, * -> + | `--alpha` |
+| Shaders.cpp (GLSL) | the composite's clip premultiplied by adding its alpha, * -> + | `--alpha` |
+| Shaders.cpp (GLSL) | Mix 1 handing the clip through untouched, 0 -> 1 | `--alpha` |
+| Shaders.cpp (GLSL) | one of the four subsamples half a pixel out, 2 -> 7 | `--grid` |
+| Shaders.cpp (GLSL) | the centre of the raster off by a tenth of it, 5 -> 6 | `--grid` |
+| Shaders.cpp (GLSL) | the flake's edge ramp a pixel outside its edge, 0 -> 1 | `--flakes` |
+| Shaders.cpp (GLSL) | the box rule's sixteen subsamples divided by 15, 6 -> 5 | `--flakes` |
+| Shaders.cpp (GLSL) | the box rule's subsamples a quarter pixel left, 1 -> 2 | `--flakes` |
+| Shaders.cpp (GLSL) | flakes drawn only outside the glass, < -> > | `--flakes` |
+| Shaders.cpp (GLSL) | the flake's quad cut inside its ellipse, + -> - | `--flakes` |
+| Shaders.cpp (GLSL) | flakes placed for a raster a fifth larger, 5 -> 6 | `--flakes` |
+| Globe.cpp | a disc's broadside mobility 1/17, 6 -> 7 | `--fall` |
+| Globe.cpp | a disc's edgewise mobility 3/22, 3 -> 2 | `--fall` |
+| Globe.cpp | Stokes's law over 8, 9 -> 8 | `--fall` |
+| Globe.cpp | the swirl's decay nu, not nu k^2, * -> / | `--swirl` |
+| Globe.cpp | the swirl's profile with j1's sign flipped, - -> + | `--swirl` |
+| Globe.cpp | a full shake spinning the fill at 1/2 rad/s, not 2, * -> / | `--swirl` |
+| Globe.cpp | flakes landing a radius outside the glass, - -> + | `--robust` |
+| Globe.cpp | a shake pushing flakes down into the glass, + -> - | `--settle` |
+| Globe.cpp | RK4's step weighted 1/5, 6 -> 5 | `--fall` |
+| Fill.cpp | glycerol's density 100 kg/m^3 high, 2 -> 3 | `--model` |
+| Fill.cpp | Hoyt's slope 0.00148, 9 -> 8 | `--model` |
+| Fill.cpp | Cheng's a 0.805, 7 -> 8 | `--model` |
+| Optics.cpp | the flakes' index ratio 2 / n, 1 -> 2 | `--flakes` |
+| Optics.cpp | the flakes' ray meeting the glass where it leaves, - -> + | `--flakes` |
+| Optics.cpp | the silhouette's tangent 1 / sqrt(D^2 + 1), - -> + | `--grid` |
+| Snowglobe.cpp | the clock in tenths of a millisecond, 6 -> 5 | `--triggers` |
+| Snowglobe.cpp | a beat placed in the frame by boundary + p0, - -> + | `--triggers` |
+| Snowglobe.cpp | kicks kept only inside the merge window, > -> < | `--triggers` |
+| Snowglobe.cpp | a button that can never be pressed, 0 -> 1 | `--triggers` |
+| Snowglobe.cpp | a kick only when band 0 is quiet, > -> < | `--triggers` |
+| Snowglobe.cpp | the frame's step the sum of two clock readings, - -> + | `--triggers` |
+| Snowglobe.cpp | the audio device opened when Trigger On is not Kick, = -> ! | `--coreaudio` |
+| Snowglobe.cpp | the ramp's integral term over 34, 2 -> 3 | `--flakes` |
+| Snowglobe.cpp | the globe a fifth larger than Globe says, 5 -> 6 | `--alpha` |
+| Audio.cpp | SNOWGLOBE_NO_DEVICES=1 read as off, 0 -> 1 | `--coreaudio` |
+
+## The sweep's honest list
+
+`tools/sweep.py` renders every control at both ends, 240 frames at 320x180 on the defaults
+with the harness's music: 10 swept, 0 dead, 0 barely alive (mean 8-bit deltas from 1.88 for
+Size to 102.9 for Mix). With `--bare` (the context table emptied) nothing goes dead either:
+the one context, Trigger On = Button for Shake Now, only isolates the press, and under Kick the
+press still adds a shake to the music's. Audio Input is not swept (it acts on devices;
+`--coreaudio` covers its gate), nor Audio (the host's FFT buffer) or the About block.
+
+## Open questions
+
+1. **A shake lifts only resting flakes.** Under kicks the snow stays in the lower part of the
+   globe: each kick lifts what has landed by up to 2R·Shake, and a later full shake (the
+   button) lifts nothing that is still falling, so the button after a run of kicks looks
+   weaker than the button on a settled globe. A shake that also lifted suspended flakes (or
+   redistributed them) would read more like a hand; it is a new choice, not in any source.
+2. **Settling takes tens of seconds** (25 s for a lift-only shake at the defaults, 33 s for the
+   largest disc to fall the whole globe at w = 0.60), as real globes do. A faster flurry needs
+   a thinner fill and leaves Stokes, so the model would need a drag law above Re 1; or a
+   "time scale" control that is honest about being one.
+3. **Outside the globe is transparent.** An option to keep the clip around the globe (or a
+   backdrop) was left out.
+4. **The kick gate's 0.25** is chosen against the harness's own music; nobody has measured
+   Resolume's FFT bins, so how it behaves on a real mix is unknown.
+5. **Ω_max = 2 rad/s and the lift height 2R·S** are chosen; no source models a hand's shake.
+6. **No base, no figurine, no glass, no Fresnel**: the outer 9 % of the card is never seen, and
+   the last pixels of the globe hold a squeezed ring with no reflection.
+7. **A flake that grows while resting pokes past the glass** until the next shake: settle it
+   again on a Size or Range change, or leave it.

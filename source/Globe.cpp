@@ -75,7 +75,7 @@ V3 Globe::SettlingVelocity( int i, const Physics& p ) const
 		const double rs = p.shape == Shape::Beads ? r : std::cbrt( 0.75 * r * r * kFilmThickness );
 		return { 0.0, -2.0 * drho * kGravity * rs * rs / ( 9.0 * mu ), 0.0 };
 	}
-	//A thin disc (Katz; Happel and Brenner): mobility 1/(16 mu a) along the
+	//A thin disc (Katz, citing Happel and Brenner, which was not read): mobility 1/(16 mu a) along the
 	//normal, 3/(32 mu a) in its plane.
 	const double weight = drho * kGravity * kPi * r * r * kFilmThickness;
 	const double c      = weight / ( mu * r );

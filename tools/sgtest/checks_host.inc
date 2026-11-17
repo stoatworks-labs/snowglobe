@@ -301,7 +301,7 @@ int runRobust( const Perturb& perturb )
 int runModel( const Perturb& perturb )
 {
 	std::printf( "\n=== model: the fill against the GPA's printed tables; x1 and the swirl mode against their equations; the harness's own trace "
-	             "against Hecht's paraxial n; the controls; a run replays exactly\n" );
+	             "against the paraxial n (OpenStax eq. 2.11); the controls; a run replays exactly\n" );
 	auto fillAt = [ & ]( double w ) {
 		FillProps f = FillAt( w );
 		if( perturb.model == 1 )
@@ -405,7 +405,7 @@ int runModel( const Perturb& perturb )
 		            worstLap, worstDiv, worstWall ) );
 	}
 	//(f) The harness's trace: paraxially, an object on the card at the
-	//centre appears magnified by n (Hecht; SPEC "The optics"). The slope of
+	//centre appears magnified by n (OpenStax eq. 2.11 and Young & Freedman's fish bowl; SPEC "The optics"; Hecht was not reachable). The slope of
 	//xi(rho) at rho = 1e-6 R against n, for the fill's n at 60 and 80 %.
 	{
 		double worst = 0.0;

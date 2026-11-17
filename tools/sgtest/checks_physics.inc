@@ -563,7 +563,8 @@ int runSwirl( const Perturb& perturb )
 {
 	std::printf( "\n=== swirl: neutral tracers at 0.15 R and 0.6 R from the centre, in a swirl about the view axis (2 rad/s at the centre); each "
 	             "one's angle off the pixels; its rate's decay against nu (x1/R)^2 with nu from the GPA's tables (tolerance Cheng's 3.5 %% + the "
-	             "fit's), the rates' ratio against 3 j1(kr)/(kr) (tolerance 1 %%)\n" );
+	             "fit's), the rates' ratio against 3 j1(kr)/(kr) (tolerance three standard errors); and a full shake from rest: the centre's spin "
+	             "off two tracers' first 0.1 s against Omega_max\n" );
 	const double x1 = rootTanX();
 	for( const Raster& raster : kRasters )
 	{
@@ -637,8 +638,8 @@ int runSwirl( const Perturb& perturb )
 				continue;
 			}
 			//Rates over windows of 0.25 s, then ln(rate) against time.
-			double rate[ 2 ] = { 0, 0 }, rms[ 2 ] = { 0, 0 }, ratioSum = 0.0;
-			int ratioN = 0;
+			double rate[ 2 ] = { 0, 0 }, rms[ 2 ] = { 0, 0 };
+			std::vector< double > ratios;
 			std::vector< double > wt[ 2 ], wl[ 2 ];
 			const size_t span = 5;
 			for( size_t i = 0; i + span < ts.size(); i += span )
@@ -650,20 +651,181 @@ int runSwirl( const Perturb& perturb )
 					wt[ k ].push_back( 0.5 * ( ts[ i ] + ts[ i + span ] ) );
 					wl[ k ].push_back( std::log( std::fabs( om[ k ] ) ) );
 				}
-				ratioSum += om[ 1 ] / om[ 0 ];
-				++ratioN;
+				ratios.push_back( om[ 1 ] / om[ 0 ] );
 			}
 			for( int k = 0; k < 2; ++k )
 				rate[ k ] = -fitSlope( wt[ k ], wl[ k ], &rms[ k ] );
 			const double fitErr  = 2.0 * rms[ 0 ] / std::max( 1e-9, std::fabs( wl[ 0 ].front() - wl[ 0 ].back() ) );
 			const double tol     = kChengError + kVolkError + fitErr;
-			const double ratio   = ratioSum / ratioN;
-			const double ratioLaw = besselProfile( x1 * radii[ 1 ] ) / besselProfile( x1 * radii[ 0 ] );
-			Check( std::fabs( rate[ 0 ] / lawRate - 1.0 ) <= tol && std::fabs( rate[ 1 ] / lawRate - 1.0 ) <= tol && std::fabs( ratio / ratioLaw - 1.0 ) <= 0.01,
+			//The ratio of the two rates: the profile at each tracer's distance
+			//from the centre (its z offset included). The optics are symmetric
+			//about the view axis, so a screen angle is the true azimuth and the
+			//ratio needs no magnification; its tolerance is three standard
+			//errors of the windows' ratios.
+			double mean = 0.0, var = 0.0;
+			for( double q : ratios )
+				mean += q / static_cast< double >( ratios.size() );
+			for( double q : ratios )
+				var += ( q - mean ) * ( q - mean ) / static_cast< double >( ratios.size() - 1 );
+			const double se       = std::sqrt( var / static_cast< double >( ratios.size() ) );
+			const double r0       = std::hypot( radii[ 0 ], 0.05 ), r1 = std::hypot( radii[ 1 ], 0.05 );
+			const double ratioLaw = besselProfile( x1 * r1 ) / besselProfile( x1 * r0 );
+			const double ratioTol = 3.0 * se / ratioLaw;
+			Check( std::fabs( rate[ 0 ] / lawRate - 1.0 ) <= tol && std::fabs( rate[ 1 ] / lawRate - 1.0 ) <= tol
+			           && std::fabs( mean / ratioLaw - 1.0 ) <= ratioTol,
 			       fmt( "%dx%d w %.2f: decay %.4f and %.4f /s at 0.15 R and 0.6 R (law %.4f /s, tau %.2f s; %+.2f%%, %+.2f%%, tolerance %.2f%%); rate "
-			            "ratio %.4f (law %.4f)",
+			            "ratio %.5f (law %.5f; %+.3f%%, tolerance %.3f%%, three standard errors of %zu windows)",
 			            raster.w, raster.h, w, rate[ 0 ], rate[ 1 ], lawRate, 1.0 / lawRate, 100.0 * ( rate[ 0 ] / lawRate - 1.0 ),
-			            100.0 * ( rate[ 1 ] / lawRate - 1.0 ), 100.0 * tol, ratio, ratioLaw ) );
+			            100.0 * ( rate[ 1 ] / lawRate - 1.0 ), 100.0 * tol, mean, ratioLaw, 100.0 * ( mean / ratioLaw - 1.0 ), 100.0 * ratioTol,
+			            ratios.size() ) );
+		}
+		//A full shake from rest: the fill spins at Omega_max = 2 rad/s at the
+		//centre about a horizontal axis (SPEC: chosen). Two neutral tracers,
+		//A above the centre (0, 0.3 R, 0) and B in front of it (0, 0, 0.3 R):
+		//u = f(r) W x x moves A across (u_x = -W_z y f) and B up (u_y = -W_x z
+		//f), neither in depth at first. Each start velocity from a cubic fit
+		//of its first 0.1 s at 240 fps off the pixels, through the trace's local
+		//magnification; |W| = hypot against 2 rad/s, tolerance three of the
+		//fits' standard errors.
+		{
+			Rig rig;
+			rig.fps           = 240.0;
+			const Floats card = clearCard( raster.w, raster.h );
+			if( !startRig( rig, raster.w, raster.h, perturb, &card ) )
+				return 1;
+			rig.Set( PT_SNOW, static_cast< float >( Shape::Beads ) );
+			rig.Set( PT_SIZE, ParamFromSize( 0.3e-3, Shape::Beads ) );
+			rig.Set( PT_RANGE, ParamFromRange( 1.0 ) );
+			rig.plugin.SetCountForTest( 2 );
+			rig.plugin.GlobeForTest().SetNeutralForTest( true );
+			if( !rig.Render( 1 ) )
+				return 1;
+			const double start[ 2 ][ 3 ] = { { 0.0, 0.3, 0.0 }, { 0.0, 0.0, 0.3 } };
+			for( int k = 0; k < 2; ++k )
+				rig.plugin.GlobeForTest().PlaceForTest( k, { start[ k ][ 0 ] * kRadius, start[ k ][ 1 ] * kRadius, start[ k ][ 2 ] * kRadius }, { 0, 1, 0 },
+				                                        false, 0.0 );
+			const int64_t shakeUs = rig.plugin.LastFrame().clockUs + 4321;
+			rig.plugin.QueueShakeForTest( shakeUs, 1.0 );
+			const double n       = gpaIndex( 0.60 );
+			const double globePx = rig.plugin.LastFrame().globePx;
+			double last[ 2 ][ 2 ], mag[ 2 ] = { 0, 0 };
+			for( int k = 0; k < 2; ++k )
+			{
+				harnessScreen( start[ k ][ 0 ], start[ k ][ 1 ], start[ k ][ 2 ], n, globePx, last[ k ][ 0 ], last[ k ][ 1 ] );
+				//px per metre along the motion: x for A, y for B.
+				double up = 0, dn = 0, o = 0;
+				if( k == 0 )
+				{
+					harnessScreen( start[ k ][ 0 ] + 1e-4, start[ k ][ 1 ], start[ k ][ 2 ], n, globePx, up, o );
+					harnessScreen( start[ k ][ 0 ] - 1e-4, start[ k ][ 1 ], start[ k ][ 2 ], n, globePx, dn, o );
+				}
+				else
+				{
+					harnessScreen( start[ k ][ 0 ], start[ k ][ 1 ] + 1e-4, start[ k ][ 2 ], n, globePx, o, up );
+					harnessScreen( start[ k ][ 0 ], start[ k ][ 1 ] - 1e-4, start[ k ][ 2 ], n, globePx, o, dn );
+				}
+				mag[ k ] = ( up - dn ) / ( 2e-4 * kRadius );
+			}
+			std::vector< double > ts, ps[ 2 ];
+			bool lost = false;
+			for( int f = 0; f < 26 && !lost; ++f )
+			{
+				if( !rig.Render( 1 ) )
+					return 1;
+				const Floats o = rig.Output();
+				const double t = static_cast< double >( rig.plugin.LastFrame().clockUs - shakeUs ) * 1e-6;
+				if( t < 0.0 )
+					continue;
+				ts.push_back( t );
+				for( int k = 0; k < 2; ++k )
+				{
+					double mx = 0, my = 0;
+					if( !alphaCentroid( o, raster.w, raster.h, last[ k ][ 0 ], last[ k ][ 1 ], std::max( 4.0, 0.03 * globePx ), mx, my ) )
+					{
+						lost = true;
+						break;
+					}
+					last[ k ][ 0 ] = mx;
+					last[ k ][ 1 ] = my;
+					ps[ k ].push_back( k == 0 ? mx : my );
+				}
+			}
+			//y = c0 + c1 t + c2 t^2 + c3 t^3 by least squares (t scaled to the
+			//window); c1 and its standard error. A quadratic leaves the
+			//rotation's cubic term in the slope: + (omega T)^2 / 10, 1.4 % here.
+			auto cubic = []( const std::vector< double >& t, const std::vector< double >& y, double& slope, double& se ) {
+				const double T = t.back();
+				double A[ 4 ][ 5 ] = {};
+				for( size_t i = 0; i < t.size(); ++i )
+				{
+					const double u        = t[ i ] / T;
+					const double row[ 4 ] = { 1.0, u, u * u, u * u * u };
+					for( int r = 0; r < 4; ++r )
+					{
+						A[ r ][ 4 ] += row[ r ] * y[ i ];
+						for( int c = 0; c < 4; ++c )
+							A[ r ][ c ] += row[ r ] * row[ c ];
+					}
+				}
+				//The inverse alongside the solution: Gauss-Jordan on [A | I].
+				double M[ 4 ][ 8 ] = {};
+				for( int r = 0; r < 4; ++r )
+				{
+					for( int c = 0; c < 4; ++c )
+						M[ r ][ c ] = A[ r ][ c ];
+					M[ r ][ 4 + r ] = 1.0;
+				}
+				for( int c = 0; c < 4; ++c )
+				{
+					int piv = c;
+					for( int r = c + 1; r < 4; ++r )
+						if( std::fabs( M[ r ][ c ] ) > std::fabs( M[ piv ][ c ] ) )
+							piv = r;
+					for( int k = 0; k < 8; ++k )
+						std::swap( M[ c ][ k ], M[ piv ][ k ] );
+					const double d = M[ c ][ c ];
+					for( int k = 0; k < 8; ++k )
+						M[ c ][ k ] /= d;
+					for( int r = 0; r < 4; ++r )
+						if( r != c )
+						{
+							const double f = M[ r ][ c ];
+							for( int k = 0; k < 8; ++k )
+								M[ r ][ k ] -= f * M[ c ][ k ];
+						}
+				}
+				double coef[ 4 ] = {};
+				for( int r = 0; r < 4; ++r )
+					for( int c = 0; c < 4; ++c )
+						coef[ r ] += M[ r ][ 4 + c ] * A[ c ][ 4 ];
+				double ss = 0.0;
+				for( size_t i = 0; i < t.size(); ++i )
+				{
+					const double u = t[ i ] / T;
+					const double e = y[ i ] - coef[ 0 ] - u * ( coef[ 1 ] + u * ( coef[ 2 ] + u * coef[ 3 ] ) );
+					ss += e * e;
+				}
+				slope = coef[ 1 ] / T;
+				se    = std::sqrt( ss / static_cast< double >( t.size() - 4 ) * M[ 1 ][ 5 ] ) / T;
+			};
+			if( lost || ts.size() < 10 )
+				Check( false, fmt( "%dx%d: a full shake's tracers lost (%zu samples)", raster.w, raster.h, ts.size() ) );
+			else
+			{
+				double vA = 0, seA = 0, vB = 0, seB = 0;
+				cubic( ts, ps[ 0 ], vA, seA );
+				cubic( ts, ps[ 1 ], vB, seB );
+				const double fA = besselProfile( x1 * 0.3 ), fB = fA;//both at r = 0.3 R
+				const double wz = -( vA / mag[ 0 ] ) / ( 0.3 * kRadius * fA );
+				const double wx = -( vB / mag[ 1 ] ) / ( 0.3 * kRadius * fB );
+				const double W  = std::hypot( wx, wz );
+				const double seW = std::hypot( wz * seA / std::max( std::fabs( vA ), 1e-12 ), wx * seB / std::max( std::fabs( vB ), 1e-12 ) )
+				                   / std::max( W, 1e-12 ) * W;
+				Check( std::fabs( W - kOmegaMax ) <= 3.0 * seW + 1e-9,
+				       fmt( "%dx%d: a full shake from rest spins the centre at %.4f rad/s about (%.3f, 0, %.3f) (Omega_max %.1f; %+.3f%%, tolerance "
+				            "%.3f%%, three standard errors of the two fits)",
+				            raster.w, raster.h, W, wx / W, wz / W, kOmegaMax, 100.0 * ( W / kOmegaMax - 1.0 ), 100.0 * 3.0 * seW / kOmegaMax ) );
+			}
 		}
 	}
 	return Verdict();

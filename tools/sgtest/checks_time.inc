@@ -240,14 +240,19 @@ int runAlpha( const Perturb& perturb )
 			return 1;
 		if( !rig.Press( PT_SHAKE_NOW ) || !rig.Render( 30 ) )
 			return 1;
-		const Floats o       = rig.Output();
-		const double globePx = rig.plugin.LastFrame().globePx;
+		const Floats o = rig.Output();
+		//The spec's silhouette at the default Globe: diameter 0.9 of the
+		//frame's height. Not the plugin's own figure, which a wrong one
+		//would agree with.
+		const double globePx = 0.5 * 0.9 * raster.h;
 		int insideNotOpaque = 0, outsideNotClear = 0, inside = 0, outside = 0;
+		double sumAlpha = 0.0;
 		for( int y = 0; y < raster.h; ++y )
 			for( int x = 0; x < raster.w; ++x )
 			{
 				const double r = std::hypot( x + 0.5 - 0.5 * raster.w, y + 0.5 - 0.5 * raster.h );
 				const float a  = o[ ( static_cast< size_t >( y ) * raster.w + x ) * 4 + 3 ];
+				sumAlpha += a;
 				if( r < globePx - 1.0 )
 				{
 					++inside;
@@ -259,10 +264,17 @@ int runAlpha( const Perturb& perturb )
 					outsideNotClear += a != 0.0f;
 				}
 			}
-		Check( passThrough && leaks == 0 && insideNotOpaque == 0 && outsideNotClear == 0 && inside > 0 && outside > 0,
+		//The silhouette's radius off the alpha alone: sqrt(sum / pi). With
+		//alpha 1 inside r - 1 and 0 outside r + 1, the sum lies between the
+		//two discs' areas, so the radius is within 1 px (the lattice's own
+		//miscount, ~sqrt(r) pixels, is under 0.03 px of radius here).
+		const double measured = std::sqrt( sumAlpha / kPi );
+		Check( passThrough && leaks == 0 && insideNotOpaque == 0 && outsideNotClear == 0 && inside > 0 && outside > 0 &&
+		           std::fabs( measured - globePx ) <= 1.0,
 		       fmt( "%dx%d: Mix 0 the clip bit for bit: %s; floats changed by white under clear texels at Mix 1 and 0.5: %d; opaque card: %d of %d "
-		            "pixels inside not opaque, %d of %d outside not clear",
-		            raster.w, raster.h, passThrough ? "yes" : "NO", leaks, insideNotOpaque, inside, outsideNotClear, outside ) );
+		            "pixels inside not opaque, %d of %d outside not clear; the silhouette's radius off the alpha %.3f px (spec 0.45 H = %.3f; "
+		            "tolerance 1 px)",
+		            raster.w, raster.h, passThrough ? "yes" : "NO", leaks, insideNotOpaque, inside, outsideNotClear, outside, measured, globePx ) );
 	}
 	return Verdict();
 }

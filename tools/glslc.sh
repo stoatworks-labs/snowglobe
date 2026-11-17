@@ -45,15 +45,14 @@ FILES = [
 ]
 
 # Shaders the plugin assembles at run time: kVersion + kCommon + the pass, the
-# order Shaders.cpp's Assemble() uses (the quad's vertex shader is assembled in
-# Marbling.cpp's InitGL). Every pass is assembled, so every one is listed; a
-# name that has moved is a KeyError.
+# order Shaders.cpp's AssembleFragment() and AssembleVertex() use. Every pass
+# is assembled, so every one is listed; a name that has moved is a KeyError.
 ASSEMBLED = {
-	"quad":    [ "kVersion", "kQuadVertex" ],
-	"bake":    [ "kVersion", "kCommon", "kBakeFragment" ],
-	"resize":  [ "kVersion", "kCommon", "kResizeFragment" ],
-	"palette": [ "kVersion", "kCommon", "kPaletteFragment" ],
-	"display": [ "kVersion", "kCommon", "kDisplayFragment" ],
+	"quad":      [ "kVersion", "kQuadVertex" ],
+	"flakevert": [ "kVersion", "kFlakeVertex" ],
+	"scene":     [ "kVersion", "kCommon", "kSceneFragment" ],
+	"flake":     [ "kVersion", "kCommon", "kFlakeFragment" ],
+	"composite": [ "kVersion", "kCommon", "kCompositeFragment" ],
 }
 
 named, unnamed = {}, []

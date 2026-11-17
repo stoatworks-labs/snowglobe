@@ -135,7 +135,7 @@ derivation of it.
 
 ## Cost
 
-`sgtest --bench` in the verify.sh run of 2026-11-17 (this Mac's GPU, Apple Silicon, shared with
+`sgtest --bench` in the final verify.sh run of 2026-11-17 (23:23–23:32) (this Mac's GPU, Apple Silicon, shared with
 other builds; load average about 15–20 throughout, so these wander between runs). Each frame
 timed alone: glFinish before and after, GL_TIME_ELAPSED for the GPU, the thread's CPU clock
 inside ProcessOpenGL, and wall time; median and worst of 120 frames after 240 of warm-up;
@@ -143,15 +143,16 @@ every timed frame checked to have rendered (0 did not).
 
 | case | raster | GPU median | GPU worst | CPU median | wall median |
 | --- | --- | --- | --- | --- | --- |
-| defaults (600 flakes), kicks from the music | 720p | 0.341 ms (2.0% of a 60 fps frame) | 0.597 ms | 1.149 ms | 1.639 ms |
-| defaults (600 flakes), kicks from the music | 1080p | 0.680 ms (4.1%) | 0.879 ms | 1.160 ms | 2.118 ms |
-| 3000 flakes (the cap), 1.25 mm, Globe 1.0, a full shake each second | 720p | 1.272 ms (7.6%) | 1.585 ms | 2.155 ms | 3.753 ms |
-| 3000 flakes (the cap), 1.25 mm, Globe 1.0, a full shake each second | 1080p | 1.248 ms (7.5%) | 2.885 ms | 2.168 ms | 3.800 ms |
+| defaults (600 flakes), kicks from the music | 720p | 0.342 ms (2.1% of a 60 fps frame) | 1.761 ms | 1.162 ms | 1.645 ms |
+| defaults (600 flakes), kicks from the music | 1080p | 0.678 ms (4.1%) | 0.885 ms | 1.162 ms | 2.111 ms |
+| 3000 flakes (the cap), 1.25 mm, Globe 1.0, a full shake each second | 720p | 1.286 ms (7.7%) | 1.629 ms | 2.159 ms | 3.738 ms |
+| 3000 flakes (the cap), 1.25 mm, Globe 1.0, a full shake each second | 1080p | 1.276 ms (7.7%) | 2.882 ms | 2.181 ms | 3.855 ms |
 
-The CPU side (the physics, 3000 flakes' projections and the instance upload) is about 1.15 ms
+The CPU side (the physics, the flakes' projections and the instance upload) is about 1.16 ms
 at the defaults and 2.2 ms at the cap, whatever the raster. The cap's GPU median at 1080p came
-out no higher than at 720p in this run (an earlier run the same day: 1.228 and 0.925 ms), which
-is the machine's load, not a property: read the cap's GPU cost as 1–1.3 ms. Not measured: 4K
+out no higher than at 720p in this run and the one before it (1.272 and 1.248 ms; earlier the
+same day, 1.228 and 0.925 ms), which is the machine's load as much as the plugin: read the
+cap's GPU cost as 1–1.3 ms. Not measured: 4K
 (the brief says no 4K loops on this shared Mac).
 
 ## The traps actually hit

@@ -153,7 +153,7 @@ Each check names its tolerance and where the tolerance comes from; AGENTS.md has
   0.46).
 - **Cost** (this Mac's GPU, shared with other builds; GL_TIME_ELAPSED medians, each frame timed
   alone): the defaults **0.34 ms at 720p and 0.68 ms at 1080p (4.1% of a 60 fps frame)**, plus
-  about 1.15 ms of CPU; 3000 flakes, the cap, about 1.25 ms of GPU at either size and 2.2 ms of
+  about 1.16 ms of CPU; 3000 flakes, the cap, about 1.28 ms of GPU at either size and 2.2 ms of
   CPU. 4K was not measured.
 
 ### Not established

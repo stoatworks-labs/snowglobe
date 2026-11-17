@@ -14,9 +14,13 @@ from 1 to 1/20, every angle and sub-pixel offset -- and prints the worst
 area and centroid errors the box rule leaves. The harness's tolerances
 (kFlakeAreaTolerance, kFlakePositionTolerance) round them up.
 
-    python3 tools/coverage.py
+    python3 tools/coverage.py [--within AREA POSITION]
+
+`--within` (verify.sh passes the harness's two constants) exits 1 if the box
+rule's worst error is not inside them.
 """
 import math
+import sys
 
 import numpy as np
 
@@ -58,7 +62,13 @@ def main():
         mx, my = (c * X).sum() / c.sum(), (c * Y).sum() / c.sum()
         worst_centre = max(worst_centre, math.hypot(mx - cx, my - cy))
     print(f"6000 ellipses, 0.2-6 px, aspect 1-1/20: worst area {100 * worst_area:.3f} %, worst centroid {worst_centre:.4f} px")
+    if len(sys.argv) == 4 and sys.argv[1] == "--within":
+        area, position = float(sys.argv[2]), float(sys.argv[3])
+        inside = worst_area < area and worst_centre < position
+        print(f"{'ok  ' if inside else 'FAIL'} inside the harness's tolerances ({100 * area:.1f} %, {position} px): {'yes' if inside else 'NO'}")
+        return 0 if inside else 1
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

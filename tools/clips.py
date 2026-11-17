@@ -1,30 +1,36 @@
-"""Resolume's own demo clips through `matest --pipe`: the alpha check, and
-the measurement Drop Size's default was set from. (intensifier's script, by
-way of nipkow.)
+"""Resolume's own demo clips through `sgtest --pipe`: the alpha check, and
+what can be measured of the defaults. (intensifier's script, by way of
+nipkow and marbling.)
 
     tools/clips.py alpha [--build DIR]      the output alpha on the DXV alpha clips
-    tools/clips.py defaults [--build DIR]   colour kept against Drop Size, every clip
+    tools/clips.py defaults [--build DIR]   the snow's cover and contrast, every clip
 
 The clips are Resolume Arena's (`/Applications/Resolume Arena/media`), DXV,
 decoded by ffmpeg (`-nostdin`: ffmpeg reads the terminal otherwise, and a
 script running it in a loop loses its input). Nothing here is a second copy
 of the plugin's formulas: every number is read off the pipe's frames.
 
-**alpha.** The plugin's decision (SPEC-marbling.md): output alpha is ink
-density, a premultiplied Mix. On BattleWeapon_Tank_09 and Ethnik2, the two
-clips with real transparency, through a marbling made by twelve presses: at
-Mix 0 every output byte is the input's; at Mix 1 and 0.5, white painted
-under every fully transparent pixel changes no output byte (the clips are
-straight alpha over black, so without the paint a plugin that ignored alpha
-would pass). The negative control paints about 200 pixels opaque instead,
-which must show.
+**alpha.** The plugin's decision (SPEC-snowglobe.md): the clip is resampled
+premultiplied, where it is transparent the globe is transparent, and outside
+the globe the output is transparent. On BattleWeapon_Tank_09 and Ethnik2,
+the two clips with real transparency, with the snow shaken up by four
+presses of Shake Now: at Mix 0 every output byte is the input's; at Mix 1
+and 0.5, white painted under every fully transparent pixel changes no
+output byte (the clips are straight alpha over black, so without the paint
+a plugin that ignored alpha would pass). The negative control paints about
+200 pixels opaque instead, which must show.
 
-**defaults.** Colour kept: a drop's ink is the clip's mean over half its
-radius, so a big drop greys the clip's colours. For each demo clip, one
-frame held still, Stone (drops only), Drop Rate 3, twelve presses: the
-standard deviation of the output's colours over the input's (RGB, mean of
-the three). Drop Size's default is the largest of the sizes tried whose
-median over the clips keeps at least 80%.
+**defaults.** The defaults are chosen (SPEC-snowglobe.md); what this
+measures is how they look against real clips. The snow's state depends only
+on the shakes and the controls, never on the clip, so one run over an
+opaque black card finds the snow: there, a pixel's luminance is the snow's
+coverage. For each demo clip, one frame held still, a full shake (Shake Now)
+at frame 5, read 1.5 s later with the snow in the air, against the same
+clip with no shake (the snow at rest on the floor): **cover** is the mean
+coverage over the globe's disc, and **contrast** the median luminance step
+(0..1) the snow adds over the clip on pixels the airborne snow covers at
+least half and the resting snow not at all. Count is tried at 150, 600 (the
+default) and 2400, each at the default Size.
 """
 
 import argparse
@@ -32,14 +38,15 @@ import pathlib
 import statistics
 import subprocess
 import sys
+import tempfile
 
 import numpy as np
 
 REPO = pathlib.Path(__file__).resolve().parent.parent
 MEDIA = pathlib.Path("/Applications/Resolume Arena/media")
 ALPHA_CLIPS = ["Shop74/BattleWeapon_Tank_09.mov", "Shop74/Ethnik2.mov"]
-SIZES = [0.03, 0.05, 0.08, 0.12, 0.18]
-KEEP = 0.8
+COUNTS = [150, 600, 2400]
+W, H = 320, 180
 
 
 def decode(path, width, height, frames, start=1.0):
@@ -53,33 +60,32 @@ def decode(path, width, height, frames, start=1.0):
     return raw[:got * size], got
 
 
-def pipe(matest, raw, width, height, settings, script):
-    args = [str(matest), "--pipe", "--size", f"{width}x{height}", "--script", str(script)]
+def pipe(sgtest, raw, width, height, settings, script):
+    args = [str(sgtest), "--pipe", "--size", f"{width}x{height}", "--script", str(script)]
     for s in settings:
         args += ["--set", s]
-    out = subprocess.run(args, input=raw, capture_output=True, env={"MARBLING_NO_DEVICES": "1", "PATH": "/usr/bin:/bin"})
+    out = subprocess.run(args, input=raw, capture_output=True, env={"SNOWGLOBE_NO_DEVICES": "1", "PATH": "/usr/bin:/bin"})
     if out.returncode != 0:
-        raise RuntimeError(f"matest --pipe failed ({out.returncode}): {out.stderr.decode()[-400:]}")
+        raise RuntimeError(f"sgtest --pipe failed ({out.returncode}): {out.stderr.decode()[-400:]}")
     return out.stdout
 
 
-def presses(path, count, every=10, first=5):
-    """A cue sheet: Trigger pressed every `every` frames, released the next."""
+def presses(path, frames):
+    """A cue sheet: Shake Now pressed at each frame, released the next."""
     lines = []
-    for k in range(count):
-        f = first + k * every
-        lines += [f"{f} Trigger 1", f"{f + 1} Trigger 0"]
+    for f in frames:
+        lines += [f"{f} Shake Now 1", f"{f + 1} Shake Now 0"]
     path.write_text("\n".join(lines) + "\n")
 
 
-def alpha(matest, scratch):
-    w, h, n = 320, 180, 160
+def alpha(sgtest, scratch):
+    n = 160
     script = scratch / "presses.cue"
-    presses(script, 12, every=4)  # all twelve inside the shorter clip's 60 frames
+    presses(script, [5, 20, 35, 50])  # all four inside the shorter clip's 60 frames
     ok = True
     for name in ALPHA_CLIPS:
-        raw, got = decode(MEDIA / name, w, h, n)
-        frames = np.frombuffer(raw, np.uint8).reshape(got, h, w, 4).copy()
+        raw, got = decode(MEDIA / name, W, H, n)
+        frames = np.frombuffer(raw, np.uint8).reshape(got, H, W, 4).copy()
         clear = frames[..., 3] == 0
         white = frames.copy()
         white[clear] = [255, 255, 255, 0]
@@ -88,14 +94,14 @@ def alpha(matest, scratch):
         idx = np.argwhere(clear[0])[:: max(1, int(clear[0].sum()) // 200)][:200]
         for j, i in idx:
             loud[:, j, i] = [255, 255, 255, 255]
-        base = ["Trigger On=Manual", "Drop Size=0.6"]
-        same0 = pipe(matest, raw, w, h, base + ["Mix=0"], script) == raw
+        base = ["Trigger On=Button"]
+        same0 = pipe(sgtest, raw, W, H, base + ["Mix=0"], script) == raw
         print(f"  {'ok  ' if same0 else 'FAIL'}  {name}: Mix 0, {got} frames, every byte the input's: {'yes' if same0 else 'NO'}")
         ok = ok and same0
         for mix in ("1", "0.5"):
-            a = np.frombuffer(pipe(matest, raw, w, h, base + [f"Mix={mix}"], script), np.uint8)
-            b = np.frombuffer(pipe(matest, white.tobytes(), w, h, base + [f"Mix={mix}"], script), np.uint8)
-            c = np.frombuffer(pipe(matest, loud.tobytes(), w, h, base + [f"Mix={mix}"], script), np.uint8)
+            a = np.frombuffer(pipe(sgtest, raw, W, H, base + [f"Mix={mix}"], script), np.uint8)
+            b = np.frombuffer(pipe(sgtest, white.tobytes(), W, H, base + [f"Mix={mix}"], script), np.uint8)
+            c = np.frombuffer(pipe(sgtest, loud.tobytes(), W, H, base + [f"Mix={mix}"], script), np.uint8)
             differ, shows = int((a != b).sum()), int((a != c).sum())
             good = differ == 0 and shows > 0 and clear.mean() > 0.05
             ok = ok and good
@@ -104,47 +110,55 @@ def alpha(matest, scratch):
     return ok
 
 
-def colour_kept(matest, scratch, clip, size):
-    w, h = 320, 180
-    raw, got = decode(clip, w, h, 1, start=2.0)
-    held = raw * 150
-    script = scratch / "drops.cue"
-    presses(script, 12)
-    out = pipe(matest, held, w, h, ["Trigger On=Manual", "Pattern=Stone", "Auto Paper=0", "Drop Rate=0.2857",
-                                     f"Drop Size={size_param(size):.6f}", "Mix=1"], script)
-    last = np.frombuffer(out[-w * h * 4:], np.uint8).reshape(h, w, 4)[..., :3].astype(float)
-    first = np.frombuffer(raw, np.uint8).reshape(h, w, 4)[..., :3].astype(float)
-    sin = first.reshape(-1, 3).std(axis=0).mean()
-    return last.reshape(-1, 3).std(axis=0).mean() / sin if sin > 1.0 else None
+def luminance(rgba):
+    rgb = rgba[..., :3].astype(float) / 255.0
+    return 0.2126 * rgb[..., 0] + 0.7152 * rgb[..., 1] + 0.0722 * rgb[..., 2]
 
 
-def size_param(radius, low=0.01, high=0.25):
-    """Drop Size's host value for a radius (Controls.cpp's geometric range, read from its comment)."""
+def last_frame(out):
+    return np.frombuffer(out[-W * H * 4:], np.uint8).reshape(H, W, 4)
+
+
+def count_param(count, low=50.0, high=3000.0):
+    """Count's host value (Controls.cpp's geometric range, 50 .. 3000, read from the spec's table)."""
     import math
-    return math.log(radius / low) / math.log(high / low)
+    return math.log(count / low) / math.log(high / low)
 
 
-def defaults(matest, scratch):
+def defaults(sgtest, scratch):
+    frames = 5 + 90 + 1  # the shake at frame 5, read 1.5 s (90 frames at 60 fps) after it
+    shaken, still = scratch / "shake.cue", scratch / "still.cue"
+    presses(shaken, [5])
+    presses(still, [])
+    black = (np.zeros((H, W, 4), np.uint8) + np.array([0, 0, 0, 255], np.uint8)).tobytes() * frames
+    yy, xx = np.mgrid[0:H, 0:W]
+    disc = np.hypot(xx + 0.5 - W / 2, yy + 0.5 - H / 2) < 0.45 * H - 1.0  # the default Globe, 0.9 of the height
     clips = sorted(p for p in MEDIA.rglob("*.mov"))
-    table = {s: [] for s in SIZES}
-    for clip in clips:
-        row = []
-        for s in SIZES:
-            k = colour_kept(matest, scratch, clip, s)
-            if k is not None:
-                table[s].append(k)
-                row.append(f"{k:.2f}")
-            else:
-                row.append("flat")
-        print(f"  {clip.relative_to(MEDIA)}: " + "  ".join(f"r {s}: {v}" for s, v in zip(SIZES, row)))
-    best = None
-    for s in SIZES:
-        med = statistics.median(table[s]) if table[s] else 0.0
-        print(f"  Drop Size {s}: median colour kept {med:.3f} over {len(table[s])} clips")
-        if med >= KEEP:
-            best = s
-    print(f"  the largest size keeping {KEEP:.0%} on the median clip: {best}")
-    return best is not None
+    ok = True
+    for count in COUNTS:
+        settings = ["Trigger On=Button", f"Count={count_param(count):.6f}"]
+        up = luminance(last_frame(pipe(sgtest, black, W, H, settings, shaken)))
+        down = luminance(last_frame(pipe(sgtest, black, W, H, settings, still)))
+        cover = float(up[disc].mean())
+        mask = disc & (up >= 0.5) & (down == 0.0)
+        contrasts = []
+        for clip in clips:
+            raw, _ = decode(clip, W, H, 1, start=2.0)
+            held = raw * frames
+            a = luminance(last_frame(pipe(sgtest, held, W, H, settings, shaken)))
+            b = luminance(last_frame(pipe(sgtest, held, W, H, settings, still)))
+            if mask.sum() > 0:
+                contrasts.append(float(np.median((a - b)[mask])))
+        if not contrasts:
+            ok = False
+            print(f"  FAIL  Count {count}: no pixel the snow covers")
+            continue
+        weak = sum(c < 0.1 for c in contrasts)
+        print(f"  Count {count:4d}{' (default)' if count == 600 else '          '}: the snow covers {cover * 100:.2f}% of the globe "
+              f"({int(mask.sum())} px at least half); its contrast over the clip, median over {len(contrasts)} clips "
+              f"{statistics.median(contrasts):.3f} (worst {min(contrasts):.3f}, best {max(contrasts):.3f}); "
+              f"{weak} clips under 0.1")
+    return ok
 
 
 def main():
@@ -152,14 +166,13 @@ def main():
     parser.add_argument("what", choices=["alpha", "defaults"])
     parser.add_argument("--build", type=pathlib.Path, default=REPO / "build")
     args = parser.parse_args()
-    matest = (args.build if args.build.is_absolute() else REPO / args.build) / "matest"
+    sgtest = (args.build if args.build.is_absolute() else REPO / args.build) / "sgtest"
     if not MEDIA.exists():
         print(f"  FAIL  {MEDIA} not found: the demo clips are Resolume Arena's")
         return 1
-    import tempfile
     with tempfile.TemporaryDirectory() as scratch:
         scratch = pathlib.Path(scratch)
-        ok = alpha(matest, scratch) if args.what == "alpha" else defaults(matest, scratch)
+        ok = alpha(sgtest, scratch) if args.what == "alpha" else defaults(sgtest, scratch)
     return 0 if ok else 1
 
 

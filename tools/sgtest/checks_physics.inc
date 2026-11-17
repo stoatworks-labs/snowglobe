@@ -219,7 +219,9 @@ Floats clearCard( int w, int h )
 }
 
 /// Least squares y = a + b t: b, and the rms residual.
-double fitSlope( const std::vector< double >& t, const std::vector< double >& y, double* rms = nullptr )
+/// The least-squares slope of y on t; rms, the residuals' root mean square;
+/// se, the slope's standard error, sqrt(SSE / (n - 2) / Sxx).
+double fitSlope( const std::vector< double >& t, const std::vector< double >& y, double* rms = nullptr, double* se = nullptr )
 {
 	const double n = static_cast< double >( t.size() );
 	double st = 0, sy = 0, stt = 0, sty = 0;
@@ -232,13 +234,13 @@ double fitSlope( const std::vector< double >& t, const std::vector< double >& y,
 	}
 	const double b = ( n * sty - st * sy ) / ( n * stt - st * st );
 	const double a = ( sy - b * st ) / n;
+	double e = 0.0;
+	for( size_t k = 0; k < t.size(); ++k )
+		e += ( y[ k ] - a - b * t[ k ] ) * ( y[ k ] - a - b * t[ k ] );
 	if( rms )
-	{
-		double e = 0.0;
-		for( size_t k = 0; k < t.size(); ++k )
-			e += ( y[ k ] - a - b * t[ k ] ) * ( y[ k ] - a - b * t[ k ] );
 		*rms = std::sqrt( e / n );
-	}
+	if( se )
+		*se = n > 2.0 ? std::sqrt( e / ( n - 2.0 ) / ( stt - st * st / n ) ) : INFINITY;
 	return b;
 }
 
@@ -366,13 +368,16 @@ int runFall( const Perturb& perturb )
 						Check( false, fmt( "%dx%d w %.2f %s: only %zu samples", raster.w, raster.h, w, mine[ k ].what, ts[ k ].size() ) );
 						continue;
 					}
-					double rmsY = 0, rmsX = 0;
-					const double vy = fitSlope( ts[ k ], ys[ k ], &rmsY );
-					const double vx = fitSlope( ts[ k ], xs[ k ], &rmsX );
+					double seY = 0, seX = 0;
+					const double vy = fitSlope( ts[ k ], ys[ k ], nullptr, &seY );
+					const double vx = fitSlope( ts[ k ], xs[ k ], nullptr, &seX );
 					const V3 e      = expectedVelocity( shape, mine[ k ].r, mine[ k ].n, row->rho, row->mu );
 					const double span = std::fabs( ys[ k ].back() - ys[ k ].front() );
-					//The fit's own error: the rms residual over the height fallen.
-					const double fitErr = 2.0 * rmsY / std::max( span, 1e-12 );
+					//The fit's own error: three standard errors of the slope,
+					//relative to the law's speed (never to the measured one:
+					//a flake that does not fall must not widen its own
+					//tolerance).
+					const double fitErr = 3.0 * seY / std::fabs( e.y );
 					const double tol    = kChengError + kVolkError + fitErr;
 					const double rel    = std::fabs( vy / e.y - 1.0 );
 					worstRel            = worse( worstRel, rel );
@@ -381,9 +386,13 @@ int runFall( const Perturb& perturb )
 					bool driftOk = true;
 					if( std::fabs( e.x ) > 1e-9 )
 					{
+						//The glide ratio is a ratio of mobilities: the fill
+						//cancels, and the tolerance is the two fits' three
+						//standard errors, propagated through the quotient.
 						const double ratioM = vx / vy, ratioE = e.x / e.y;
-						driftOk             = std::fabs( ratioM - ratioE ) <= 0.02 * std::fabs( ratioE ) + 2.0 * rmsX / std::max( span, 1e-12 );
-						drift               = fmt( "; glide/fall %.4f (law %.4f)", ratioM, ratioE );
+						const double seR    = std::fabs( ratioE ) * std::hypot( seX / std::fabs( e.x ), seY / std::fabs( e.y ) );
+						driftOk             = std::fabs( ratioM - ratioE ) <= 3.0 * seR;
+						drift               = fmt( "; glide/fall %.5f (law %.5f, tolerance %.5f)", ratioM, ratioE, 3.0 * seR );
 					}
 					Check( rel <= tol && driftOk,
 					       fmt( "%dx%d w %.2f %s: fell %.4f mm/s (law %.4f; %+.2f%%, tolerance %.2f%%) over %.2f mm, %zu samples%s", raster.w, raster.h, w,
@@ -638,7 +647,7 @@ int runSwirl( const Perturb& perturb )
 				continue;
 			}
 			//Rates over windows of 0.25 s, then ln(rate) against time.
-			double rate[ 2 ] = { 0, 0 }, rms[ 2 ] = { 0, 0 };
+			double rate[ 2 ] = { 0, 0 }, seRate[ 2 ] = { 0, 0 };
 			std::vector< double > ratios;
 			std::vector< double > wt[ 2 ], wl[ 2 ];
 			const size_t span = 5;
@@ -654,8 +663,11 @@ int runSwirl( const Perturb& perturb )
 				ratios.push_back( om[ 1 ] / om[ 0 ] );
 			}
 			for( int k = 0; k < 2; ++k )
-				rate[ k ] = -fitSlope( wt[ k ], wl[ k ], &rms[ k ] );
-			const double fitErr  = 2.0 * rms[ 0 ] / std::max( 1e-9, std::fabs( wl[ 0 ].front() - wl[ 0 ].back() ) );
+				rate[ k ] = -fitSlope( wt[ k ], wl[ k ], nullptr, &seRate[ k ] );
+			//Three standard errors of the worse fit, relative to the law's
+			//rate (not the measured one, which a swirl that never decays
+			//would make zero and the tolerance infinite).
+			const double fitErr  = 3.0 * std::max( seRate[ 0 ], seRate[ 1 ] ) / lawRate;
 			const double tol     = kChengError + kVolkError + fitErr;
 			//The ratio of the two rates: the profile at each tracer's distance
 			//from the centre (its z offset included). The optics are symmetric
@@ -819,8 +831,11 @@ int runSwirl( const Perturb& perturb )
 				const double wz = -( vA / mag[ 0 ] ) / ( 0.3 * kRadius * fA );
 				const double wx = -( vB / mag[ 1 ] ) / ( 0.3 * kRadius * fB );
 				const double W  = std::hypot( wx, wz );
-				const double seW = std::hypot( wz * seA / std::max( std::fabs( vA ), 1e-12 ), wx * seB / std::max( std::fabs( vB ), 1e-12 ) )
-				                   / std::max( W, 1e-12 ) * W;
+				//Each component's standard error through the same scale,
+				//then |W|'s: sqrt((wz se_z)^2 + (wx se_x)^2) / |W|.
+				const double seZ = seA / ( mag[ 0 ] * 0.3 * kRadius * fA );
+				const double seX = seB / ( mag[ 1 ] * 0.3 * kRadius * fB );
+				const double seW = W > 0.0 ? std::hypot( wz * seZ, wx * seX ) / W : INFINITY;
 				Check( std::fabs( W - kOmegaMax ) <= 3.0 * seW + 1e-9,
 				       fmt( "%dx%d: a full shake from rest spins the centre at %.4f rad/s about (%.3f, 0, %.3f) (Omega_max %.1f; %+.3f%%, tolerance "
 				            "%.3f%%, three standard errors of the two fits)",

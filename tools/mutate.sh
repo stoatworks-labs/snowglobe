@@ -129,7 +129,7 @@ for check in $checks; do
 	status=0
 	limit "$LIMIT" "$sgtest" "$check" --size 320x180 >"$WORK/log" 2>&1 || status=$?
 	if [[ "$status" -ne 0 ]]; then
-		{ grep -E '^  FAIL' "$WORK/log" || true; } | head -3 | cut -c1-160 | sed 's/^/        /'
+		{ command grep -E '^  FAIL' "$WORK/log" || true; } | /usr/bin/head -3 | cut -c1-160 | sed 's/^/        /'
 		printf '   FAIL  %s fails (exit %d) on the unmutated build: it would catch every mutant\n' "$check" "$status"
 		exit 1
 	fi
@@ -151,14 +151,14 @@ for entry in "${MUTANTS[@]}"; do
 	if ! cmake --build "$build" --target sgtest -j6 >"$WORK/log" 2>&1; then
 		# A mutant that does not compile tests nothing.
 		printf '   FAIL  the mutant does not build:\n'
-		{ grep -E 'error' "$WORK/log" || true; } | head -2 | cut -c1-160 | sed 's/^/        /'
+		{ command grep -E 'error' "$WORK/log" || true; } | /usr/bin/head -2 | cut -c1-160 | sed 's/^/        /'
 		continue
 	fi
 	if [[ ! -f "$object" || ! -x "$sgtest" ]] || cmp -s "$object" "$WORK/base/$( basename "$object" )"; then
 		printf '   FAIL  the mutant is not in the build (%s unchanged or missing)\n' "$( basename "$object" )"
 		continue
 	fi
-	if [[ "$file" == source/Shaders.cpp ]] && ! grep -qF -- "$mutant" "$sgtest"; then
+	if [[ "$file" == source/Shaders.cpp ]] && ! command grep -qF -- "$mutant" "$sgtest"; then
 		printf '   FAIL  the mutated GLSL is not in the sgtest binary\n'
 		continue
 	fi
@@ -172,7 +172,7 @@ for entry in "${MUTANTS[@]}"; do
 		timeouts=$(( timeouts + 1 ))
 	else
 		printf '   ok    %s fails against the mutant (exit %d):\n' "$check" "$status"
-		{ grep -E '^  FAIL' "$WORK/log" || true; } | head -2 | cut -c1-160 | sed 's/^/        /'
+		{ command grep -E '^  FAIL' "$WORK/log" || true; } | /usr/bin/head -2 | cut -c1-160 | sed 's/^/        /'
 		caught=$(( caught + 1 ))
 	fi
 done

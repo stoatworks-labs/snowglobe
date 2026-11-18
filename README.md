@@ -100,7 +100,7 @@ the snow behind the card). Mix 0 hands the clip through bit for bit.
 
 **2026-11-17, v0.1.0; public from 18 November 2026.** Built and verified offline on one Mac (Apple Silicon);
 never loaded into Resolume, never run against a real audio device, never built on Windows.
-No OpenFX port and no browser demo.
+No OpenFX port; a [browser demo](#browser-demo).
 
 ### Measured offline, on macOS
 
@@ -169,6 +169,23 @@ Each check names its tolerance and where the tolerance comes from; AGENTS.md has
   transparent parts of the clip leave unrefracted.
 - Resolume's FFT onsets: earshot's host fallback is frame-quantised and uncalibrated.
 - Windows: never built.
+
+## Browser demo
+
+[snowglobe-demo.stoatworks-labs.com](https://snowglobe-demo.stoatworks-labs.com/) runs the
+plugin in your browser: its own C++, the plugin class with the flakes and the swirl stepped in
+double, the fill's tables, the optics, its audio input and earshot under it, compiled unmodified
+to WebAssembly and drawing with its own GLSL in WebGL2. The page is the host, and it never opens
+or lists an audio device or asks for a microphone. It feeds the plugin through earshot's
+`feed()` as `sgtest` does: `sgtest`'s own track of kicks and hats, nothing at all (`sgtest
+--silent`: Resolume's FFT, empty, so Kick never fires), or an audio file of yours decoded in the
+page and never uploaded. The beat is a tempo in the page's host row, and Shake Now has a button
+there too. Audio Input, the Audio buffer and the live-device path are not in the browser. The
+output is transparent outside the globe, as in Resolume, where you put a layer behind it; the
+page puts a checkerboard there. A frame of the page matched `sgtest`'s on the same settings and
+audio to a mean of at most 0.013 of an 8-bit code in eight cases, under 1 % of values off, all
+at the edges of flakes that came to rest on the glass in a different 8 ms step
+([AGENTS.md](AGENTS.md#browser-demo) says why). It is a demo, not the plugin, and the page lists what it leaves out.
 
 ## Build
 

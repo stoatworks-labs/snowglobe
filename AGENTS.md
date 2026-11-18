@@ -18,7 +18,7 @@ mutants, 10 of 10 controls alive in the sweep and in the bare sweep, oxbow readi
 rendering the bundle with devices disabled. **Never loaded into Resolume; no live
 audio device ever opened.** earshot is a snapshot of
 `github.com/stoatworks-labs/earshot` at `8124191`, unpatched. No OpenFX port, no
-browser demo, no user guide.
+user guide; a browser demo ("Browser demo" below).
 
 ## The idea
 
@@ -218,7 +218,7 @@ the card at the centre); 20 °C; n at the sodium D line; Resolume's FFT onsets u
 (earshot's host fallback is frame-quantised and uncalibrated).
 
 Not done: loading it into Resolume; a live device; a Windows build; a user guide, presets, an
-OpenFX port, a browser demo; a 4K bench.
+OpenFX port; a 4K bench.
 
 ## Would this hold on another rasteriser, at another raster?
 
@@ -354,6 +354,102 @@ Size to 102.9 for Mix). With `--bare` (the context table emptied) nothing goes d
 the one context, Trigger On = Button for Shake Now, only isolates the press, and under Kick the
 press still adds a shake to the music's. Audio Input is not swept (it acts on devices;
 `--coreaudio` covers its gate), nor Audio (the host's FFT buffer) or the About block.
+
+## Browser demo
+
+https://snowglobe-demo.stoatworks-labs.com/ (2026-11-18), from `demo/`, deployed by
+`wrangler.toml` (a Worker route: the zone is at Cloudflare's 100 custom domains, so
+`snowglobe-demo` is a proxied AAAA `100::` record made through the API) and
+`.github/workflows/deploy.yml` on every push to main. woofer's pattern, which is mirrorball's.
+
+- **It runs the plugin, it doesn't port it.** `demo/snowglobe-core.wasm` is `Snowglobe.cpp` and
+  everything it calls (Globe, Fill, Optics, Audio, Controls, PassBuffer, Shaders, Diag),
+  earshot's snapshot (every `src/*.cpp` but `Miniaudio.cpp`/`MiniaudioImpl.cpp`, with
+  `NoCapture.cpp`: its own `EARSHOT_CAPTURE=OFF` build, so the module has no device backend at
+  all) and the FFGL SDK's plugin classes, FFGLLog, FFGLShader, FFGLFBO, the scoped bindings and
+  FFGLUtilities, compiled unmodified by emscripten (`demo/tools/build-wasm.sh`). Left out:
+  `EffectPlugin.cpp`. The script fails if a `source/*.cpp` or an earshot `src/*.cpp` it
+  doesn't list appears. No change to `source/` was needed for WebGL2 or emscripten.
+- **What is the page's**: `demo/wasm/glue.cpp` plays the host (constructs the plugin, reads its
+  declarations back through the SDK so the panel is built from them, forwards
+  SetFloatParameter, SetBeatInfo, SetTime and ProcessOpenGL as sgtest's Rig does, and hands the
+  page the harness's accessors: LastFrame(), ShakeLog(), GlobeForTest(), CurrentPhysics(),
+  earshot's frame); `demo/wasm/gl_shim.cpp` takes glShaderSource (refusing any text that isn't
+  byte for byte the page's assembly of `demo/shaders.js`, then the kit's `port()`) and
+  glEnable/glDisable/glIsEnabled (GL_PROGRAM_POINT_SIZE, which WebGL2 lacks); the host row
+  (audio, tempo, a Shake Now button); the read-outs' units, tooltips, the nine presets (in
+  glycerol fractions, metres and counts, through the plugin's own inverses via
+  `sg_param_from`, Size's with the preset's Snow), the lines under the picture and Diag's log
+  from emscripten's memory file system (`SNOWGLOBE_LOG_DIR=/snowglobe/logs`, made by
+  `sg_prepare`, since Diag's own `mkdir -p` goes through `system()`). Off the panel: Audio
+  Input, the Audio buffer and the About block (the panel's note says so).
+- **The audio, never a device.** The page never calls a device API (`check_shaders.py` fails if
+  a served file names getUserMedia, enumerateDevices or mediaDevices), the module cannot open
+  one, and `sg_prepare` sets `SNOWGLOBE_NO_DEVICES=1`. The host row's choices: sgtest's track
+  (`musicAt` and `kRate` copied from `tools/sgtest/main.cpp` into the glue, and the Rig's
+  Render lines that feed it, from `const int from` to `fedUntil = t;`, held by
+  `check_shaders.py`); nothing (`--silent`: Resolume's FFT on a buffer nobody writes, so Kick
+  never fires); and a file of the visitor's, decoded by `decodeAudioData` in an
+  `OfflineAudioContext` at 48 kHz (no output device), its first two channels averaged as
+  `readWav` does, fed L = R through `sg_feed` and looped (`sgtest --wav` plays once, at the
+  file's rate). Nothing is played aloud. Every audio change is a new instance from time 0, and
+  the page's default is the track where the plugin's own is Resolume's FFT.
+- **The beat and the button.** SetBeatInfo goes every frame with the host row's tempo (120 BPM
+  at first) and a bar phase on the page's clock, `fmod( t * bpm / 240, 1 )` from time 0 at a
+  fixed tempo (sgtest `--beat`'s phase), continuous across a tempo change and still while
+  paused. Shake Now (FF_TYPE_EVENT) is a kit boolean the page lets go of after one frame
+  (filings' rule): one rising edge.
+- **The float target.** The scene pass blends into RGBA32F, which WebGL2 does only with
+  EXT_color_buffer_float (the kit's `needFloat`) and EXT_float_blend (checked by the page,
+  which stops with a message rather than show another picture).
+- **The clock.** Seconds from frame deltas (capped at 0.1 s). Each new instance (load, a change
+  of audio, Restart) is primed with five frames about a millisecond apart so the
+  seconds-or-milliseconds vote settles before the first frame shown; nothing is fed and the
+  phase stands still during them. The plugin steps on its own wall clock until the vote
+  settles, so its clock then runs 6 to 12 ms ahead of the page's (the wall decides).
+- **Checked by `tools/verify.sh`** ("Browser demo's copies", `demo/tools/check_shaders.py`):
+  the six GLSL pieces and kVersion character for character and the order
+  AssembleVertex()/AssembleFragment() join them for all three programs (read from Shaders.cpp
+  and InitGL's stage table); all 21 uniforms set by the setter their type takes (the two
+  `uniform()` overloads typed by their argument) and nothing undeclared set; sgtest's track and
+  feed lines in the glue; no served file naming a device API; the hashes of every input the
+  .wasm was built from (`demo/wasm/inputs.sha256`, 68 files) and the SDK pin. Any change under
+  `source/` (a regenerated `StoatworksAbout.h` included) or `external/earshot/` needs
+  `demo/tools/build-wasm.sh` rerun and its outputs committed (mode 644).
+- **Compared with sgtest, once (2026-11-18), by `demo/tools/crosscheck.py`** (in the repo;
+  nothing runs it by itself: it needs Chrome, cdpshot and a built sgtest). Headless Chrome on
+  the real GPU (ANGLE on Metal), the page paused, the settings applied, Restart, then N presses
+  of Step (the clock at N/60, the track fed to N/60); Mix 0 hands the clip back so the canvas is
+  the exact input frame; `sgtest --pipe --fps 60 --beat 120` gets that frame N + 1 times with
+  the same host values, and its frame N is compared, as premultiplied colour and alpha. Apple
+  M4 Max, 640×360 (921,600 values a case: colour and alpha; "off" is by more than half a code),
+  the last of three runs (the offset, and with it the numbers, move from run to run: the
+  defaults' mean was 6.7e-3, 8.1e-3 and 1.3e-2):
+
+  | case | clip | N | mean colour diff (codes) | values off | max | shakes (page) |
+  | --- | --- | --- | --- | --- | --- | --- |
+  | defaults, the track | scene | 360 | 1.3e-2 | 5,715 | 12 | 11 |
+  | Trigger On Beat at 120 BPM | grid | 240 | 9.1e-3 | 3,671 | 17 | 8 |
+  | beads 0.2 mm in 75 % glycerol | bars | 300 | 3.2e-5 | 22 | 1 | 9 |
+  | 3000 flakes, Shake 0.8, Globe 0.6 | detail | 200 | 4.4e-3 | 2,349 | 8 | 6 |
+  | Mix 50 % | spot | 180 | 2.0e-3 | 968 | 8 | 5 |
+  | the shape on transparency | alpha | 240 | 8.4e-3 | 4,090 | 19 | 7 |
+  | nothing fed (Kick never fires) | ramp | 120 | 3.0e-5 | 23 | 1 | 0 |
+  | Button, Shake Now after step 30 | scene | 150 | 2.6e-3 | 936 | 15 | 1 |
+
+  Not exact, and why: sgtest presets the plugin's clock, the page lets it vote, so the page's
+  instance runs some milliseconds ahead and the 8 ms RK4 grid falls elsewhere between the same
+  shakes. `Globe::step` lands a flake at the end of the grid step it crossed the glass in
+  (`Globe::land`, along the radius), so a landed flake lies up to one step's fall from sgtest's,
+  a few hundredths of a pixel, and the next shake lifts it from there. Hence the few values off
+  at flake edges, growing with the snow that has landed, and the beads (slower, smaller)
+  agreeing to a code. The negative controls (Shake one slider step off; no press) differ by 1.03
+  and 7.1 codes on average, 80 and 2,700 times their cases'. The script fails a case past a
+  mean of 0.02 codes or 1 % of values off. A Resolume host's vote moves the
+  grid the same way.
+- **Not checked on the page**: the vendored kit (`demo/vendor/`, stoatworks-backend's
+  `resolume-demo/sync.sh`, never edited here); the read-outs' units and the presets beyond
+  their inverses; any browser but headless Chrome on this Mac.
 
 ## Open questions
 

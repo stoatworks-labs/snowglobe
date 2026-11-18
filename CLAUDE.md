@@ -83,6 +83,13 @@ trace or the flake coverage (`source/Shaders.cpp`), the event times (`gatherEven
   Beat or Button, the plugin neither lists devices nor looks a name up. A microphone prompt in
   a test run is a bug.
 - Shared Mac: arm64 builds while iterating, no 4K loops, never kill a process you didn't start.
+- Browser demo (`demo/`, AGENTS.md "Browser demo"; live at snowglobe-demo.stoatworks-labs.com,
+  deployed on every push to main): after ANY change under `source/` (a regenerated
+  `StoatworksAbout.h` included) or `external/earshot/`, rerun `demo/tools/build-wasm.sh`
+  (emscripten) and commit its outputs; after a shader change, `python3
+  demo/tools/check_shaders.py --write`. verify.sh fails until you do. Against sgtest: `python3
+  demo/tools/crosscheck.py --sgtest build/sgtest`. `demo/vendor/` is the kit, synced from
+  stoatworks-backend's `resolume-demo/sync.sh`: never edit it here.
 
 ## Notes
 - **Units are metres and seconds in the physics, R = 40 mm, the globe's centre the origin, y

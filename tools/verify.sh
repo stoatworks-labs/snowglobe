@@ -66,9 +66,9 @@ reserved_words || fail "a GLSL reserved word is used as an identifier"
 #---------------------------------------------------------------------------
 step "GLSL: nothing WebGL2 lacks"
 #---------------------------------------------------------------------------
-# The fleet's browser demos run the shaders unedited in WebGL2 (GLSL ES 3.00).
-# Snowglobe has no demo yet; the rule is kept so one can be made without
-# rewriting a shader.
+# The fleet's browser demos run the shaders unedited in WebGL2 (GLSL ES 3.00),
+# and so does snowglobe's (demo/): a built-in ES 3.00 lacks would stop the
+# page compiling the plugin's own text.
 if command grep -nE '(^|[^A-Za-z_])(findMSB|findLSB|bitCount|bitfieldExtract|bitfieldInsert|bitfieldReverse|uaddCarry|usubBorrow|umulExtended|imulExtended|frexp|ldexp|fma|textureGather|textureQueryLevels|packUnorm4x8|unpackUnorm4x8)[[:space:]]*\(' source/Shaders.cpp | command grep -vE '^[0-9]+:[[:space:]]*//' ; then
 	fail "a built-in GLSL ES 3.00 does not have is in the GLSL"
 fi
@@ -78,6 +78,18 @@ echo "   none"
 step "Shaders"
 #---------------------------------------------------------------------------
 tools/glslc.sh || fail "a shader does not compile"
+
+#---------------------------------------------------------------------------
+step "Browser demo's copies"
+#---------------------------------------------------------------------------
+# demo/shaders.js must be source/Shaders.cpp's GLSL character for character,
+# with the order AssembleVertex() and AssembleFragment() join it in for all
+# three programs; every uniform must be set by the setter its type takes
+# (WebGL2 drops a wrong one silently); the glue's track and feed must be
+# sgtest's; no served file may name a device API; and the .wasm's recorded
+# inputs must still hash as they did when demo/tools/build-wasm.sh built it
+# (rebuilding needs emscripten). Never skipped: the demo is in this repo.
+python3 demo/tools/check_shaders.py || fail "the demo's copies have drifted from the plugin's"
 
 #---------------------------------------------------------------------------
 step "Submodule and snapshot"

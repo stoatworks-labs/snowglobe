@@ -1,0 +1,19 @@
+/*
+ * Snowglobe's own additions to the kit's page: the lines under the picture
+ * and the plugin's log. Everything else is vendor/kit.css, unedited.
+ * (woofer's, without its photosensitivity note.)
+ */
+
+.sg-status { overflow-wrap: anywhere; }
+
+.sg-note { overflow-wrap: anywhere; }
+
+.sg-log {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* The host row's file note may run long: let it wrap rather than widen the page. */
+#snowglobe-audio-note { min-width: 0; max-width: 100%; overflow-wrap: anywhere; white-space: normal; }

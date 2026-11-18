@@ -270,7 +270,31 @@ s2=${PIPESTATUS[0]}
 set -e
 [[ "$s1" -eq 1 && "$s2" -eq 1 ]] || fail "a closed stdout gave exit $s1 (--pipe), $s2 (--film), not 1"
 echo "ok   2.5 frames in, exactly 2 out; --film 3 is 3; a bad cue, an unknown option, a word, nan, 2 and an unknown name refused (exit 2); options by name accepted; | head -c 1 exits 1, not 141"
-rm -f "$raw" "$cues" "$out"
+# --wav (the video's and the flash survey's music): a file that is not a WAV
+# is refused, and a WAV of kicks shakes the globe where a WAV of silence
+# leaves it still -- so the file really reaches earshot's feed().
+kicks=$( mktemp ); quiet=$( mktemp ); a=$( mktemp ); b=$( mktemp )
+python3 - "$kicks" "$quiet" <<'PY'
+import math, struct, sys, wave
+rate = 44100
+for path, loud in ((sys.argv[1], True), (sys.argv[2], False)):
+    frames = bytearray()
+    for n in range(rate * 3):
+        t = n / rate
+        beat = math.fmod(t, 0.5)
+        s = 0.6 * math.exp(-beat / 0.06) * math.sin(2 * math.pi * (55 + 60 * math.exp(-beat / 0.02)) * beat) if loud else 0.0
+        frames += struct.pack('<hh', int(s * 32767), int(s * 32767))
+    with wave.open(path, 'wb') as w:
+        w.setnchannels(2); w.setsampwidth(2); w.setframerate(rate); w.writeframes(bytes(frames))
+PY
+status=0
+"$SGTEST" --film 1 --size 64x36 --wav "$cues" >/dev/null 2>&1 || status=$?
+[[ "$status" -eq 2 ]] || fail "--wav of a text file gave exit $status, not 2"
+"$SGTEST" --film 180 --size 64x36 --wav "$kicks" > "$a" 2>/dev/null || fail "--film with a WAV of kicks"
+"$SGTEST" --film 180 --size 64x36 --wav "$quiet" > "$b" 2>/dev/null || fail "--film with a WAV of silence"
+! cmp -s "$a" "$b" || fail "--wav: a WAV of kicks gave the same frames as a WAV of silence"
+echo "ok   --wav: a text file refused (exit 2); a WAV of kicks shakes the globe, a WAV of silence does not"
+rm -f "$raw" "$cues" "$out" "$kicks" "$quiet" "$a" "$b"
 
 #---------------------------------------------------------------------------
 step "Negative controls"

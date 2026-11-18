@@ -16,8 +16,8 @@
 
         sgtest --out /tmp/s.png        the defaults over the harness's card and its music, 12 s in
         sgtest --list                  every parameter and its default
-        sgtest --pipe                  raw RGBA frames in on stdin, out on stdout
-        sgtest --film N                N frames, raw RGBA on stdout
+        sgtest --pipe [--wav F.wav]    raw RGBA frames in on stdin, out on stdout
+        sgtest --film N [--wav F.wav]  N frames, raw RGBA on stdout
         sgtest --offline               the checks that need no GL context
 
     SGTEST_RENDERER=software asks for Apple's software renderer by id.
@@ -376,6 +376,7 @@ struct Rig
 	bool msClock        = false;         ///< SetTime in milliseconds (Resolume's habit)
 	double beatBpm      = 0.0;           ///< > 0: SetBeatInfo every frame, phase from the clock
 	std::function< double( double ) > audio;///< fed through earshot each frame when set
+	int audioRate = kRate;                  ///< the rate `audio` is sampled and fed at
 	std::function< void( int ) > beforeFrame;
 	double fedUntil = 0.0;
 
@@ -470,15 +471,15 @@ struct Rig
 			if( audio )
 			{
 				//Every sample from the last frame's time to this one, once.
-				const int from = static_cast< int >( std::llround( fedUntil * kRate ) );
-				const int to   = static_cast< int >( std::llround( t * kRate ) );
+				const int from = static_cast< int >( std::llround( fedUntil * audioRate ) );
+				const int to   = static_cast< int >( std::llround( t * audioRate ) );
 				if( to > from )
 				{
 					std::vector< float > pcm( static_cast< size_t >( to - from ) * 2 );
 					for( int k = from; k < to; ++k )
 						pcm[ static_cast< size_t >( k - from ) * 2 ] = pcm[ static_cast< size_t >( k - from ) * 2 + 1 ] =
-							static_cast< float >( audio( static_cast< double >( k ) / kRate ) );
-					plugin.AudioForTest().Feed( pcm.data(), to - from, kRate, 2 );
+							static_cast< float >( audio( static_cast< double >( k ) / audioRate ) );
+					plugin.AudioForTest().Feed( pcm.data(), to - from, audioRate, 2 );
 				}
 				fedUntil = t;
 			}
@@ -682,12 +683,118 @@ enum class AudioSource
 {
 	Music,  ///< the harness's kicks and hats, through earshot's feed()
 	Silent, ///< nothing fed: Resolume's FFT path with an empty buffer
+	Wav,    ///< --wav: a file's samples, through earshot's feed()
 };
+
+//---------------------------------------------------------------------------
+// --wav: a PCM or float WAV (16, 24 or 32 bit), mixed to mono and fed through
+// earshot's feed() at the file's own rate, as a device would deliver it:
+// frame k gets samples [round(k R / fps), round((k + 1) R / fps)). After the
+// file ends, silence. For the video and the flash survey: Resolume's own
+// demo stems drive the shakes, and the same file is the soundtrack. (The
+// reader is woofer's wftest's.)
+//---------------------------------------------------------------------------
+struct Wav
+{
+	int rate     = 0;
+	int channels = 0;
+	Floats mono;
+};
+
+bool readWav( const std::string& path, Wav& wav, std::string& error )
+{
+	std::ifstream file( path, std::ios::binary );
+	if( !file )
+	{
+		error = "cannot open " + path;
+		return false;
+	}
+	Bytes data( ( std::istreambuf_iterator< char >( file ) ), std::istreambuf_iterator< char >() );
+	auto u32 = [ & ]( size_t at ) { return static_cast< uint32_t >( data[ at ] | ( data[ at + 1 ] << 8 ) | ( data[ at + 2 ] << 16 ) | ( data[ at + 3 ] << 24 ) ); };
+	auto u16 = [ & ]( size_t at ) { return static_cast< uint32_t >( data[ at ] | ( data[ at + 1 ] << 8 ) ); };
+	if( data.size() < 12 || std::memcmp( data.data(), "RIFF", 4 ) != 0 || std::memcmp( data.data() + 8, "WAVE", 4 ) != 0 )
+	{
+		error = path + " is not a RIFF WAVE file";
+		return false;
+	}
+	int format = 0, bits = 0;
+	size_t at  = 12;
+	while( at + 8 <= data.size() )
+	{
+		const uint32_t size = u32( at + 4 );
+		if( std::memcmp( data.data() + at, "fmt ", 4 ) == 0 && at + 8 + 16 <= data.size() )
+		{
+			format       = static_cast< int >( u16( at + 8 ) );
+			wav.channels = static_cast< int >( u16( at + 10 ) );
+			wav.rate     = static_cast< int >( u32( at + 12 ) );
+			bits         = static_cast< int >( u16( at + 22 ) );
+			if( format == 0xFFFE && size >= 40 )
+				format = static_cast< int >( u16( at + 8 + 24 ) );
+		}
+		else if( std::memcmp( data.data() + at, "data", 4 ) == 0 )
+		{
+			if( wav.channels <= 0 || wav.rate <= 0 || ( format != 1 && format != 3 ) )
+			{
+				error = path + ": only PCM or float WAV";
+				return false;
+			}
+			//A header claiming 0 or 8 bits would make a zero-sized frame and an
+			//endless loop below: refuse anything but the three depths read here.
+			if( bits != 16 && bits != 24 && bits != 32 )
+			{
+				error = path + ": only 16, 24 or 32-bit WAV";
+				return false;
+			}
+			const int bytes        = bits / 8;
+			const size_t frameSize = static_cast< size_t >( bytes ) * wav.channels;
+			const size_t end       = std::min< size_t >( data.size(), at + 8 + size );
+			const int used         = std::min( 2, wav.channels );
+			for( size_t p = at + 8; p + frameSize <= end; p += frameSize )
+			{
+				float sum = 0.0f;
+				for( int c = 0; c < used; ++c )
+				{
+					const size_t q = p + static_cast< size_t >( c ) * bytes;
+					float v        = 0.0f;
+					if( format == 3 && bits == 32 )
+						std::memcpy( &v, &data[ q ], 4 );
+					else if( bits == 16 )
+						v = static_cast< int16_t >( u16( q ) ) / 32768.0f;
+					else if( bits == 24 )
+						v = static_cast< float >( static_cast< int32_t >( ( data[ q ] << 8 ) | ( data[ q + 1 ] << 16 ) | ( data[ q + 2 ] << 24 ) ) / 2147483648.0 );
+					else if( bits == 32 )
+						v = static_cast< float >( static_cast< int32_t >( u32( q ) ) / 2147483648.0 );
+					sum += v;
+				}
+				wav.mono.push_back( sum / static_cast< float >( used ) );
+			}
+			if( wav.mono.empty() )
+			{
+				error = path + ": no samples";
+				return false;
+			}
+			return true;
+		}
+		at += 8 + size + ( size & 1 );
+	}
+	error = path + ": no data chunk";
+	return false;
+}
+
+Wav g_wav;
 
 void attachAudio( Rig& rig, AudioSource source, double beatBpm )
 {
 	if( source == AudioSource::Music )
 		rig.audio = musicAt;
+	else if( source == AudioSource::Wav )
+	{
+		rig.audioRate = g_wav.rate;
+		rig.audio     = []( double t ) {
+            const double k = std::round( t * g_wav.rate );
+            return k >= 0.0 && k < static_cast< double >( g_wav.mono.size() ) ? static_cast< double >( g_wav.mono[ static_cast< size_t >( k ) ] ) : 0.0;
+		};
+	}
 	rig.beatBpm = beatBpm;
 }
 
@@ -842,6 +949,7 @@ int main( int argc, char** argv )
 			             "  --set \"Name=V\"    set a parameter by its display name (an option by its name). Repeatable.\n"
 			             "  --at N \"Name=V\"  (with --out) set it at frame N instead; an event is released the frame after\n"
 			             "  --silent          feed no music (default: the harness's kicks and hats through earshot's feed())\n"
+			             "  --wav F.wav       (with --pipe/--film) feed this file instead, through earshot's feed() at its own rate\n"
 			             "  --beat BPM        the host's beat: SetBeatInfo every frame (Trigger On = Beat to use it)\n"
 			             "  --list            every parameter and its default\n"
 			             "  --pipe            raw RGBA frames in on stdin, out on stdout\n"
@@ -878,6 +986,17 @@ int main( int argc, char** argv )
 			beatBpm = std::strtod( argv[ ++i ], nullptr );
 		else if( argument == "--silent" )
 			source = AudioSource::Silent;
+		else if( argument == "--wav" && hasNext )
+		{
+			const std::string path = argv[ ++i ];
+			std::string error;
+			if( !readWav( path, g_wav, error ) )
+			{
+				std::fprintf( stderr, "--wav: %s\n", error.c_str() );
+				return 2;
+			}
+			source = AudioSource::Wav;
+		}
 		else if( argument == "--at" && i + 2 < argc )
 		{
 			const int at = std::atoi( argv[ ++i ] );

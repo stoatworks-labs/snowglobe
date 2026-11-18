@@ -39,6 +39,10 @@ trace or the flake coverage (`source/Shaders.cpp`), the event times (`gatherEven
 - A clip through it: `ffmpeg -i in.mov -f rawvideo -pix_fmt rgba - | ./build/sgtest --pipe --fps 30 --size WxH | ffmpeg -f rawvideo -pix_fmt rgba -s WxH -r 30 -i - out.mp4`.
   A partial last frame is dropped (said on stderr); a reader that hangs up ends it with exit
   1, not SIGPIPE's 141.
+- Music from a file: `--wav F.wav` (with `--pipe` or `--film`) feeds a 16/24/32-bit PCM or
+  float WAV, mixed to mono, through earshot's `feed()` at the file's own rate instead of the
+  harness's kicks and hats; silence after it ends. The video and the flash survey use
+  Resolume's own demo stems this way, never a device.
 
 ## Verify
 - Everything: `OXBOW=/path/to/oxbow TMPDIR=<a directory of your own> tools/verify.sh` under

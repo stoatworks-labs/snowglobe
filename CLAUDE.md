@@ -23,8 +23,8 @@ trace or the flake coverage (`source/Shaders.cpp`), the event times (`gatherEven
 - Configure: `cmake -B build -DCMAKE_BUILD_TYPE=Release`
 - Fast dev build: add `-DCMAKE_OSX_ARCHITECTURES=arm64`
 - Build: `cmake --build build -j8`
-- Install to Resolume: `cmake --install build`. Never from a shared session on this Mac:
-  nothing here has been loaded into Arena.
+- Install to Resolume: `cmake --install build`. Never from a shared session on this Mac, and
+  never while someone else's Arena is running.
 - Render offline: `./build/sgtest --out /tmp/s.png` (the defaults on the harness's colour card,
   fed the harness's kicks and hats through earshot's `feed()`, 12 s in); `--frames N`,
   `--size WxH`, `--clip F` (raw RGBA at `--size`), `--silent`, `--beat BPM` (the host's beat:

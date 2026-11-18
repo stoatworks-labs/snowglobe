@@ -1,8 +1,10 @@
 # snowglobe
 
 > **AI-assisted project.** This codebase was created with [Claude](https://claude.com/claude-code)
-> (Anthropic), directed and reviewed by a human author. **It has never been loaded into
-> Resolume, and it has never opened a live audio device.** What's established is established
+> (Anthropic), directed and reviewed by a human author. **It has run in Resolume only briefly,
+> in Arena 7.27.1 on Windows on one layer over a still with no sound device, it has never been
+> loaded into Arena on a Mac, and it has never opened a live audio device: it has never been
+> seen shaking to music inside Resolume.** What's established is established
 > by an offline harness, `sgtest`, that drives the real plugin class through the same
 > `ProcessOpenGL` a host calls, in a headless GL context on a synthetic clock, on this Mac's GPU
 > at 1280x720 and 320x180 and on Apple's software renderer, and feeds it audio through the same
@@ -98,9 +100,36 @@ the snow behind the card). Mix 0 hands the clip through bit for bit.
 
 ## Status
 
-**2026-11-17, v0.1.0; public from 18 November 2026.** Built and verified offline on one Mac (Apple Silicon);
-never loaded into Resolume, never run against a real audio device, never built on Windows.
-No OpenFX port; a [browser demo](#browser-demo).
+**v0.1.0, 18 November 2026. Run in Resolume only briefly, in Arena on Windows over a still with
+no sound device; never loaded into Arena on a Mac, and no live audio device ever opened.**
+No OpenFX port; a [browser demo](#browser-demo) and a [user guide](https://stoatworks-labs.com/software/snowglobe/guide/).
+
+> **Photosensitivity.** At the defaults it added no flash to any of Resolume's 33 demo clips.
+> **With Shake and Count both at full**, the snow can fill the globe and blank the clip on every
+> kick or beat: on one dark clip (Cyberspace 09) that crossed three flashes a second over a third
+> of the picture, 7 to 8 rises and falls in its worst second (the line is 6), with every music
+> tried. The [user guide](https://stoatworks-labs.com/software/snowglobe/guide/#flashing) has the table. Check your settings before you
+> put this in front of an audience; outside the globe is transparent, so the layer you put behind
+> it matters too.
+
+### In Resolume
+
+- **Windows: Arena 7.27.1 on win-lab** (Mesa llvmpipe, no GPU, no sound device), with the x64 DLL
+  the release workflow built from this source: the fleet's Arena gate passed 9 checks, failed none
+  and skipped 2. It loads, registers as `SW Snowglobe` / `SG01`, an effect, shows all 18 controls
+  (Opacity and the 17 declared) with the declared name, order, type, range and default, renders,
+  and 10 controls move the picture: with no sound the snow lies still on the glass, where Fill,
+  Snow, Size, Range, Count, Globe and Mix act, and Shake acts under Trigger On at Beat, shaking on
+  Arena's clock. Audio Input and the Audio buffer are skipped there (no sound device), and Shake
+  Now is recorded inert (the gate presses no buttons). Arena's log was clean and it survived the
+  run. The MSVC build of snowglobe and of earshot has no warnings, and `tools/wincheck.ps1` loads
+  the DLL as a host does and reads back its 17 parameters.
+- **macOS: never loaded into Arena.** Arena was already in use on the release Mac, and was left
+  alone. So **Resolume's own FFT has never been seen shaking the globe**: with Audio Input at
+  Resolume FFT, the default, whether Resolume's spectrum of a real mix gives the Kick trigger its
+  kicks is unknown. Beat and Button don't depend on it; Beat was seen shaking the globe in Arena on
+  Windows.
+- It has never been in a show, and nothing was timed inside Resolume.
 
 ### Measured offline, on macOS
 
@@ -167,8 +196,18 @@ Each check names its tolerance and where the tolerance comes from; AGENTS.md has
 - Only the swirl's slowest mode, linear: no secondary circulation, no inertial waves.
 - No glass wall, no reflections, no meniscus or bubble, no base or figurine; rays through
   transparent parts of the clip leave unrefracted.
-- Resolume's FFT onsets: earshot's host fallback is frame-quantised and uncalibrated.
-- Windows: never built.
+- **Never seen shaking to music inside Resolume.** Resolume's FFT has never been tried (above),
+  and no live audio device has been opened. Resolume's FFT is a coarse feed: a spectrum once a
+  frame, so a kick is placed to the frame, and the kick gate (a quarter of the loudest band) was
+  set on the harness's music.
+- **Chosen, not measured, and open:** a shake lifts only flakes at rest, so under steady kicks
+  the snow stays in the lower part of the globe; settling takes tens of seconds (25 s after a
+  lift-only shake at the defaults), as real globes do, and no faster fill stays in Stokes;
+  outside the globe is transparent, with no option to keep the clip there; the kick gate's 0.25,
+  Ω_max 2 rad/s and the 2R·S lift are choices; and a flake grown (Size, Range) while resting
+  pokes past the glass until the next shake.
+- **Full Shake and Count can flash** on a dark clip (above, and the [user guide](https://stoatworks-labs.com/software/snowglobe/guide/#flashing)).
+- No presets and no OpenFX port. The [user guide](https://stoatworks-labs.com/software/snowglobe/guide/) is `docs/USER-GUIDE.md`.
 
 ## Browser demo
 
@@ -210,7 +249,8 @@ cmake --install build
 The last one copies `Snowglobe.bundle` into `~/Documents/Resolume Arena/Extra Effects`.
 Restart Arena: **SW Snowglobe** is under Effects.
 
-Windows needs Visual Studio 2022 and vcpkg (for GLEW). It has never been built.
+Windows needs Visual Studio 2022 and vcpkg (for GLEW); `.github/workflows/release.yml` is the
+recipe the release builds with.
 
 ## Building and testing
 

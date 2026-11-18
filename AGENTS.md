@@ -15,10 +15,19 @@ Mac (Apple Silicon) against a fresh universal Release build: 102 checks at 1280x
 no GL context, the box rule against `--flakes`' tolerances, Arena's two DXV alpha clips and the
 defaults' measurement through `--pipe`, the pipe, 27 of 27 negative controls, 46 of 46
 mutants, 10 of 10 controls alive in the sweep and in the bare sweep, oxbow reading and
-rendering the bundle with devices disabled. **Never loaded into Resolume; no live
-audio device ever opened.** earshot is a snapshot of
-`github.com/stoatworks-labs/earshot` at `8124191`, unpatched. No OpenFX port, no
-user guide; a browser demo ("Browser demo" below).
+rendering the bundle with devices disabled. **In Resolume only on Windows**: Arena 7.27.1 on
+win-lab (llvmpipe, no sound device), the fleet's gate on the release workflow's DLL, 9 passed,
+0 failed, 2 skipped (Audio Input and Audio need sound; Shake Now inert). **Never loaded into
+Arena on a Mac** (Arena was in use there at release and was left alone), so Resolume's FFT has
+never been seen giving Kick its kicks; **no live audio device ever opened.** MSVC compiles
+snowglobe and earshot with no warnings (CI). earshot is a snapshot of
+`github.com/stoatworks-labs/earshot` at `8124191`, unpatched. A user guide (`docs/USER-GUIDE.md`)
+and a browser demo ("Browser demo" below); no OpenFX port.
+**Flashes:** the release's survey (33 demo clips, 20 s each at 60 fps, music through `--wav`,
+the fleet's flashcheck) found none over the line at the defaults (worst window 5 transitions in
+a second) and one clip over it at Shake 1 and Count 1 under Kick or Beat (Cyberspace_09, 7-8 in
+a third-of-frame window, bare 0, with four different mixes): the guide, README, demo, video and
+posts carry the warning; no default was changed.
 
 ## The idea
 
@@ -217,8 +226,8 @@ orientation; the slowest mode only, linear; the shake (Ω_max, the lift); the ge
 the card at the centre); 20 °C; n at the sodium D line; Resolume's FFT onsets usable
 (earshot's host fallback is frame-quantised and uncalibrated).
 
-Not done: loading it into Resolume; a live device; a Windows build; a user guide, presets, an
-OpenFX port; a 4K bench.
+Not done: Arena on a Mac (and so Resolume's FFT onsets); a live device; presets, an OpenFX port;
+a 4K bench.
 
 ## Would this hold on another rasteriser, at another raster?
 

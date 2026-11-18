@@ -115,7 +115,7 @@ jobs:
         # pwsh checks only the LAST exit code of a step: it is checked here.
         # -Params changes whenever a control or the About block does.
         run: |
-          ./tools/wincheck.ps1 -Dll "build/Release/Snowglobe.dll" -Name "SW Snowglobe" -Id SG01 -Kind effect -Params 16 -First "Shake"
+          ./tools/wincheck.ps1 -Dll "build/Release/Snowglobe.dll" -Name "SW Snowglobe" -Id SG01 -Kind effect -Params 17 -First "Shake"
           if( $LASTEXITCODE ) { exit $LASTEXITCODE }
 
       - uses: actions/upload-artifact@v7

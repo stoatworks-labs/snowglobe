@@ -108,9 +108,10 @@ trace or the flake coverage (`source/Shaders.cpp`), the event times (`gatherEven
 - `external/earshot/` is a snapshot of earshot (`github.com/stoatworks-labs/earshot`) at
   `8124191`, unpatched (`SNAPSHOT`). Never edit it here; change earshot upstream and take a new
   snapshot. Its own CLAUDE.md and AGENTS.md are earshot's as of that commit, status lines and all.
-- **Provisional hand copies:** `source/StoatworksAbout*.h` (guide = "", no user guide) and
-  `ATTRIBUTIONS.md`. Once the project is registered in stoatworks-backend, `sync-about.py`
-  and `sync-attributions.py` generate them; edit them there then.
+- **Generated, never edited here:** `source/StoatworksAbout.h` (stoatworks-backend's
+  `sync-about.py`, from the website's projects.json) and `ATTRIBUTIONS.md` (`sync-attributions.py`,
+  from the backend's `attributions/derived.json`). A regenerated About header can change the
+  parameter count (wincheck's `-Params` in both workflows; `verify.sh` says when they disagree).
 - **CI** (`.github/workflows/ci.yml`): macOS builds arm64 with the tools and runs `--list`,
   `--offline` and `glslc`; Windows builds the DLL with MSVC and loads it as a host does
   (`tools/wincheck.ps1`, whose `-Params` changes whenever a control or the About block does;

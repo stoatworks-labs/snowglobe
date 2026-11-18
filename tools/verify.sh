@@ -93,9 +93,14 @@ echo "ok   FFGL SDK pinned at $pin"
 command grep -q '^Commit:   8124191 ' external/earshot/SNAPSHOT || fail "external/earshot/SNAPSHOT is not earshot 8124191"
 command grep -q '^Patches:  none' external/earshot/SNAPSHOT || fail "external/earshot/SNAPSHOT records a patch: AGENTS.md must say what and why"
 echo "ok   earshot snapshot 8124191, unpatched"
-# No workflows: the repo is private, and the fleet runs Actions only on public repos.
-[[ ! -d .github/workflows ]] || fail ".github/workflows exists: this repo builds and tests locally only"
-echo "ok   no GitHub workflows"
+# The workflows: the repo is public (github.com/stoatworks-labs/snowglobe), so
+# it carries CI and the release build. Both must load the DLL the way a host
+# does, with the parameter count the plugin really declares (wincheck's
+# -Params moves with every control and with the About block).
+for wf in ci release; do
+	[[ -f ".github/workflows/$wf.yml" ]] || fail ".github/workflows/$wf.yml is missing"
+done
+echo "ok   ci.yml and release.yml present"
 
 #---------------------------------------------------------------------------
 step "Build (universal)"
@@ -161,6 +166,16 @@ check_bundle() {
 	echo "ok   a host reads $display $ffid $kind, and oxbow selftest renders through it"
 }
 check_bundle "Snowglobe" "com.stoatworks.ffgl.snowglobe" "SW Snowglobe" "SG01" "effect"
+# The Windows DLL is checked on GitHub's runner by tools/wincheck.ps1 against a
+# parameter count written into both workflows: it must be the count the plugin
+# declares (the About block's buttons change it), and the first name Shake.
+count=$( "$SGTEST" --list | tail -n +2 | wc -l | tr -d ' ' )
+first=$( "$SGTEST" --list | sed -n '2p' | awk '{print $2}' )
+for wf in ci release; do
+	command grep -q -- "-Params $count -First \"$first\"" ".github/workflows/$wf.yml" \
+		|| fail "$wf.yml's wincheck does not ask for -Params $count -First \"$first\""
+done
+echo "ok   both workflows' wincheck ask for the $count parameters the plugin declares, $first first"
 
 #---------------------------------------------------------------------------
 step "Checks (this Mac's GPU, 1280x720 and 320x180)"

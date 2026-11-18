@@ -8,15 +8,16 @@ departs from it).
 
 ## Status
 
-**v0.1.0, local only, 2026-11-17.** `OXBOW=… TMPDIR=… tools/verify.sh` passes on this
+**v0.1.0, 2026-11-17; public at `github.com/stoatworks-labs/snowglobe` from 2026-11-18.**
+`OXBOW=… TMPDIR=… tools/verify.sh` passes on this
 Mac (Apple Silicon) against a fresh universal Release build: 102 checks at 1280x720 and
 320x180, every picture check again on Apple's software renderer at 320x180, `--offline` with
 no GL context, the box rule against `--flakes`' tolerances, Arena's two DXV alpha clips and the
 defaults' measurement through `--pipe`, the pipe, 27 of 27 negative controls, 46 of 46
 mutants, 10 of 10 controls alive in the sweep and in the bare sweep, oxbow reading and
 rendering the bundle with devices disabled. **Never loaded into Resolume; no live
-audio device ever opened.** Never built on Windows. No remote, nothing released, not on the
-website. earshot is a snapshot of `~/dev/earshot` at `8124191`, unpatched. No OpenFX port, no
+audio device ever opened.** earshot is a snapshot of
+`github.com/stoatworks-labs/earshot` at `8124191`, unpatched. No OpenFX port, no
 browser demo, no user guide.
 
 ## The idea
@@ -108,8 +109,10 @@ published, and the harness measures each off the rendered pixels.
   `SNOWGLOBE_NO_DEVICES` is unset; the device menu is listed on the first frame that needs it,
   never in the constructor. earshot's CMake links CoreAudio, AudioToolbox and CoreFoundation at
   load time, so the claim is "nothing calls into them or loads them by name", not "not linked".
-- **No `.github/workflows/`.** The repo has no remote; Actions are for public repos only on
-  this machine.
+- **Workflows only once public.** Actions are for public repos only on this machine. Until it
+  was public snowglobe shipped none, so nothing could run by accident; `ci.yml` and
+  `release.yml` came with the public repo (woofer's, from mirrorball's CI and filings' release,
+  with `wincheck.ps1`).
 
 ## Defaults
 

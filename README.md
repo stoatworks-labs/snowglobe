@@ -70,7 +70,7 @@ much the glass magnifies the clip.
 
 ## Triggers
 
-- **Kick** (the default): kick drums, from earshot's lowest band (40–160 Hz). Resolume's FFT by
+- **Kick** (the default): kick drums, from [earshot](https://github.com/stoatworks-labs/earshot)'s lowest band (40–160 Hz). Resolume's FFT by
   default, or a capture device. Kicks within 50 ms are one shake.
 - **Beat**: each quarter of Resolume's bar, placed inside the frame.
 - **Button**: Shake Now only. Shake Now is a full shake, and works under every source.
@@ -98,7 +98,7 @@ the snow behind the card). Mix 0 hands the clip through bit for bit.
 
 ## Status
 
-**2026-11-17, v0.1.0, local only.** Built and verified offline on one Mac (Apple Silicon);
+**2026-11-17, v0.1.0; public from 18 November 2026.** Built and verified offline on one Mac (Apple Silicon);
 never loaded into Resolume, never run against a real audio device, never built on Windows.
 No OpenFX port and no browser demo.
 

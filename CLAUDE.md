@@ -7,7 +7,8 @@ a decaying swirl after each shake, and lie still on the glass once they land. Th
 to 3000 flakes and the swirl's one vector) lives on the CPU in double, stepped by RK4 on an
 8 ms grid; the scene is ray-traced per pixel in the fragment shader. Shakes from earshot's
 kicks, the host's beat or a button. C++/GLSL, CMake MODULE → universal `.bundle` (macOS) +
-Windows `.dll` (never built). MIT.
+Windows `.dll` (built on GitHub's Windows runner). MIT. Public:
+`github.com/stoatworks-labs/snowglobe`.
 
 | id | display name | bundle | type |
 | --- | --- | --- | --- |
@@ -47,7 +48,7 @@ trace or the flake coverage (`source/Shaders.cpp`), the event times (`gatherEven
 ## Verify
 - Everything: `OXBOW=/path/to/oxbow TMPDIR=<a directory of your own> tools/verify.sh` under
   bash (GLSL reserved words and WebGL2 gaps, `glslc`, the submodule pin, the earshot snapshot,
-  no workflows, a fresh universal build with no warnings outside `external/`, lipo, plist,
+  both workflows and their parameter count, a fresh universal build with no warnings outside `external/`, lipo, plist,
   ad-hoc signature, `oxbow probe` and `selftest` -- oxbow and TMPDIR are required, never
   skipped; every check at 1280x720 and 320x180; every picture check again on Apple's software
   renderer at 320x180; `--offline`; the box rule's error against `--flakes`' tolerances;
@@ -104,16 +105,21 @@ trace or the flake coverage (`source/Shaders.cpp`), the event times (`gatherEven
 - `snowglobe_core` is an OBJECT library: the plugin registers itself from a file-scope
   constructor nothing references.
 - The macOS build must be universal. Check with `lipo`, never the build log.
-- `external/earshot/` is a snapshot of `~/dev/earshot` at `8124191`, unpatched (`SNAPSHOT`).
-  Never edit it here; change earshot upstream and take a new snapshot.
+- `external/earshot/` is a snapshot of earshot (`github.com/stoatworks-labs/earshot`) at
+  `8124191`, unpatched (`SNAPSHOT`). Never edit it here; change earshot upstream and take a new
+  snapshot. Its own CLAUDE.md and AGENTS.md are earshot's as of that commit, status lines and all.
 - **Provisional hand copies:** `source/StoatworksAbout*.h` (guide = "", no user guide) and
   `ATTRIBUTIONS.md`. Once the project is registered in stoatworks-backend, `sync-about.py`
   and `sync-attributions.py` generate them; edit them there then.
-- **No `.github/workflows/`, on purpose.** GitHub Actions only on a public repo, and this one
-  has no remote. Add CI (`sgtest --offline` and the software-renderer subset) only once it is
-  public.
-- Local only: `~/dev/snowglobe`, no remote, nothing released, not on the website, never loaded
-  into Resolume. The spec is `~/Projects/resolume/specs/SPEC-snowglobe.md`.
+- **CI** (`.github/workflows/ci.yml`): macOS builds arm64 with the tools and runs `--list`,
+  `--offline` and `glslc`; Windows builds the DLL with MSVC and loads it as a host does
+  (`tools/wincheck.ps1`, whose `-Params` changes whenever a control or the About block does;
+  `verify.sh` checks both workflows ask for the count `sgtest --list` gives). `release.yml`
+  builds the universal bundle and the DLL with their zips, `.dmg` and installer; dispatched by
+  hand it builds without publishing, and a `v*` tag publishes. Actions only because the repo is
+  public: a private copy must never enable them.
+- Checkout: `~/Projects/resolume/snowglobe`, public at `github.com/stoatworks-labs/snowglobe`.
+  The spec is `~/Projects/resolume/specs/SPEC-snowglobe.md`.
 
 ## Diagnostics
 

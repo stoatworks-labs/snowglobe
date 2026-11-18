@@ -15,7 +15,7 @@ their work.
 
 ### Live audio — Stoatworks earshot
 
-<https://github.com/stoatworks-labs/earshot> (intended home; on 2026-11-17 a local repository only)  
+<https://github.com/stoatworks-labs/earshot>  
 Licence: MIT  
 Copyright: Stoatworks
 
@@ -23,11 +23,11 @@ Vendored at external/earshot as a snapshot of commit 8124191, unmodified (extern
 
 ### The plugin shell, the triggers, the harness and the tooling — Stoatworks marbling
 
-marbling: a local repository on 2026-11-17  
+<https://github.com/stoatworks-labs/marbling>  
 Licence: MIT  
 Copyright: Stoatworks Labs
 
-The OBJECT core with the plugin registered from the MODULE target alone, the table of controls, the device menu whose values are earshot's device keys (spasis's, by way of rubens), the host-clock vote (rosette's, by way of haze), `SetBeatInfo` read as ferrofluid's Drive does (each quarter of the bar placed inside the frame, the plugin's own clock when the phase stands still), the device gate, and the About block (source/StoatworksAbout*.h, a provisional hand copy of marbling's); the harness's rig, PNG writer, cue sheets, `--pipe`/`--film` (SIGPIPE ignored, a closed stdout exits 1), `--negative` with its perturbation hooks, `--names`, `--cues`, `--coreaudio` and its interposer (tools/sgtest/audiospy.c), `--offline` and `--bench`; tools/verify.sh, tools/mutate.sh, tools/glslc.sh, tools/sweep.py and tools/clips.py (nipkow's, by way of intensifier). All adapted; marbling took most of them from rubens and haze (local repositories).
+The OBJECT core with the plugin registered from the MODULE target alone, the table of controls, the device menu whose values are earshot's device keys (spasis's, by way of rubens), the host-clock vote (rosette's, by way of haze), `SetBeatInfo` read as ferrofluid's Drive does (each quarter of the bar placed inside the frame, the plugin's own clock when the phase stands still), the device gate, and the About block (source/StoatworksAbout*.h, a provisional hand copy of marbling's); the harness's rig, PNG writer, cue sheets, `--pipe`/`--film` (SIGPIPE ignored, a closed stdout exits 1), `--negative` with its perturbation hooks, `--names`, `--cues`, `--coreaudio` and its interposer (tools/sgtest/audiospy.c), `--offline` and `--bench`; tools/verify.sh, tools/mutate.sh, tools/glslc.sh, tools/sweep.py and tools/clips.py (nipkow's, by way of intensifier). All adapted; marbling took most of them from rubens (<https://github.com/stoatworks-labs/rubens>) and haze (<https://github.com/stoatworks-labs/haze>).
 
 ### The pass buffers, the log and the GL state guard — Stoatworks millpond and vectrix, from resolume-scopes
 

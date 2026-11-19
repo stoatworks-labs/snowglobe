@@ -1,5 +1,5 @@
 //===========================================================================
-// Time and the host: --rate, --clock, --resize, --alpha, --triggers.
+// Time and the host: --rate, --clock, --resize, --alpha, --triggers, --hostfft.
 //===========================================================================
 
 /// 97 BPM: a quarter every 0.618557 s, on no frame boundary at 24, 60 or
@@ -399,6 +399,224 @@ int runTriggers( const Perturb& perturb )
 		Check( unmatched == 0 && missed == 0 && doubled == 0 && n > 0,
 		       fmt( "the music, 1..5 s: %d shakes; %d outside 0..%.1f ms of a kick, %d of 8 kicks missed, %d doubled; latest %.1f ms after its kick",
 		            n, unmatched, late * 1e3, missed, doubled, worst * 1e3 ) );
+	}
+	return Verdict();
+}
+
+//===========================================================================
+// --hostfft: Kick on Resolume's own FFT, earshot's host path alone. A drum
+// loop becomes the 64 bins Arena 7.29.0 was measured to send (earshot's
+// AGENTS.md, "Resolume's 64 bins, measured") and is handed to the plugin as
+// its FF_USAGE_FFT buffer, element by element, as a host does; nothing goes
+// through feed(). Under earshot 8124191 (each bin whole to the band holding
+// its centre) band 0 got no bin and this never shook.
+//===========================================================================
+
+/// Arena's FFT buffer as measured: every 2048 samples of the engine's rate, a
+/// 2048-point Hann-windowed DFT of the newest 2048 samples (the mono sum
+/// (L + R) / 2: the loop is the same on both sides), and bin k the sum of
+/// |X_i| / 2N over the 16 fine bins 16k .. 16k + 15. That is linear, fs / 128
+/// a bin (375 Hz at 48 kHz) to fs / 2, a magnitude, a sine of amplitude A
+/// reading A / 4 in its bin and 0.75 of that split 1 : 3 on a boundary, as
+/// measured. Held between updates, as Arena holds it.
+struct HostSpectrum
+{
+	static constexpr int kN = 2048;
+	int rate;
+	std::function< double( double ) > signal;
+	std::vector< float > bins = std::vector< float >( 64, 0.0f );
+	int64_t updated           = -1;
+
+	HostSpectrum( int r, std::function< double( double ) > s ) : rate( r ), signal( std::move( s ) ) {}
+
+	const std::vector< float >& at( double t )
+	{
+		const int64_t u = static_cast< int64_t >( std::floor( t * rate / kN + 1e-9 ) );
+		if( u == updated )
+			return bins;
+		updated = u;
+		std::vector< std::complex< double > > x( kN );
+		for( int n = 0; n < kN; ++n )
+		{
+			const int64_t sample = u * kN - kN + n;
+			const double hann    = 0.5 - 0.5 * std::cos( 2.0 * kPi * n / kN );
+			x[ static_cast< size_t >( n ) ] = hann * signal( static_cast< double >( sample ) / rate );
+		}
+		//Radix-2, in place.
+		for( int i = 1, j = 0; i < kN; ++i )
+		{
+			int bit = kN >> 1;
+			for( ; j & bit; bit >>= 1 )
+				j ^= bit;
+			j ^= bit;
+			if( i < j )
+				std::swap( x[ static_cast< size_t >( i ) ], x[ static_cast< size_t >( j ) ] );
+		}
+		for( int len = 2; len <= kN; len <<= 1 )
+		{
+			const std::complex< double > w = std::polar( 1.0, -2.0 * kPi / len );
+			for( int i = 0; i < kN; i += len )
+			{
+				std::complex< double > wk( 1.0, 0.0 );
+				for( int k = 0; k < len / 2; ++k )
+				{
+					const auto a = x[ static_cast< size_t >( i + k ) ], b = x[ static_cast< size_t >( i + k + len / 2 ) ] * wk;
+					x[ static_cast< size_t >( i + k ) ]           = a + b;
+					x[ static_cast< size_t >( i + k + len / 2 ) ] = a - b;
+					wk *= w;
+				}
+			}
+		}
+		for( int k = 0; k < 64; ++k )
+		{
+			double sum = 0.0;
+			for( int i = 16 * k; i < 16 * k + 16; ++i )
+				sum += std::abs( x[ static_cast< size_t >( i ) ] );
+			bins[ static_cast< size_t >( k ) ] = static_cast< float >( sum / ( 2.0 * kN ) );
+		}
+		return bins;
+	}
+};
+
+/// 128 BPM (Arena's Beat 001), so the kicks fall at every phase of the
+/// 2048-sample updates. The parts: the harness's kick on every beat; a clap on
+/// two and four and hats on the eighths between, as noise twice differenced
+/// (-52 dB at 375 Hz), so they put nothing in bin 0; a 49 Hz bass held
+/// throughout, in bin 0 with the kick.
+constexpr double kLoopBeat = 60.0 / 128.0;
+enum LoopPart : int
+{
+	kLoopKick = 1,
+	kLoopTop  = 2,///< claps and hats
+	kLoopBass = 4
+};
+
+double drumLoopAt( double t, int parts, int rate )
+{
+	if( t < 0.0 )
+		return 0.0;
+	//The sample's own index, rounded: truncating t * rate repeats and skips
+	//samples, and a differenced noise that does is no longer high-passed (it
+	//put a click's worth into bin 0 and shook the globe once in 6 s).
+	const uint32_t n  = static_cast< uint32_t >( std::llround( t * rate ) );
+	const double beat = std::fmod( t, kLoopBeat );
+	double s          = 0.0;
+	if( parts & kLoopBass )
+		s += 0.2 * std::sin( 2.0 * kPi * 49.0 * t );
+	if( parts & kLoopKick )
+		s += 0.6 * std::exp( -beat / 0.06 ) * std::sin( 2.0 * kPi * ( 55.0 + 60.0 * std::exp( -beat / 0.02 ) ) * beat );
+	if( parts & kLoopTop )
+	{
+		auto hiss = [ n ]( uint32_t seed ) {
+			return Hash01( n, seed, 0u ) - 2.0 * Hash01( n - 1u, seed, 0u ) + Hash01( n - 2u, seed, 0u );
+		};
+		const double clap = std::fmod( t, 2.0 * kLoopBeat ) - kLoopBeat;
+		if( clap >= 0.0 )
+			s += 0.3 * std::exp( -clap / 0.03 ) * hiss( 11u );
+		const double hat = std::fmod( t + kLoopBeat / 2.0, kLoopBeat );
+		s += 0.2 * std::exp( -hat / 0.01 ) * hiss( 7u );
+	}
+	return s;
+}
+
+int runHostFft( const Perturb& perturb )
+{
+	std::printf( "\n=== hostfft: Kick on Resolume's FFT alone (the bins as Arena 7.29.0 sends them, nothing fed): a drum loop at 128 BPM gives "
+	             "one shake per kick, at 48 and at 44.1 kHz, within two of the host's updates and a frame; claps and hats above bin 0 none; over a "
+	             "bass held in bin 0 no kick is missed (the extra shakes the bass's beating gives are counted); earshot reads the bins at the "
+	             "host's rate\n" );
+	const Raster raster = kRasters.back();
+	struct Run
+	{
+		int rate;
+		int parts;
+		const char* what;
+	};
+	const Run runs[] = {
+		{ 48000, kLoopKick | kLoopTop, "the drum loop" },
+		{ 44100, kLoopKick | kLoopTop, "the drum loop" },
+		{ 48000, kLoopTop, "claps and hats alone" },
+		{ 48000, kLoopKick | kLoopTop | kLoopBass, "the drum loop over a held 49 Hz bass" },
+	};
+	for( const Run& run : runs )
+	{
+		Rig rig;
+		if( !startRig( rig, raster.w, raster.h, perturb ) )
+			return 1;
+		rig.plugin.SetSampleRate( static_cast< unsigned int >( run.rate ) );
+		rig.Set( PT_TRIGGER_ON, static_cast< float >( TriggerOn::Kick ) );
+		rig.Set( PT_INPUT, 0.0f );//Resolume FFT
+		const int parts = run.parts, rate = run.rate;
+		HostSpectrum host( run.rate, [ parts, rate ]( double t ) { return drumLoopAt( t, parts, rate ); } );
+		rig.beforeFrame = [ &rig, &host ]( int f ) {
+			const std::vector< float >& b = host.at( rig.Seconds( f ) );
+			for( unsigned int j = 0; j < 64; ++j )
+				rig.plugin.SetParamElementValue( PT_AUDIO, j, b[ j ] );
+		};
+		if( !rig.Render( 360 ) )
+			return 1;
+		const double hostRate = rig.plugin.AudioForTest().HostRateForTest();
+		const auto& log       = rig.plugin.ShakeLog();
+		if( !( parts & kLoopKick ) )
+		{
+			std::string at;
+			for( const ShakeRecord& sr : log )
+				at += fmt( " %.3f s", static_cast< double >( sr.us ) * 1e-6 );
+			Check( log.empty(), fmt( "%s, %d Hz, 6 s: %zu shakes (want none)%s", run.what, run.rate, log.size(), at.empty() ? "" : ( ", at" + at ).c_str() ) );
+			continue;
+		}
+		//Seen by the second update after the kick at the latest (the first may
+		//hold only its window's Hann-weighted tail), then read at the next frame.
+		const double late = 2.0 * HostSpectrum::kN / run.rate + 1.0 / rig.fps + 1e-6;
+		int unmatched = 0, missed = 0, doubled = 0, n = 0, expected = 0;
+		double worst = 0.0;
+		std::vector< int > hits( 16, 0 );
+		for( const ShakeRecord& sr : log )
+		{
+			const double t = static_cast< double >( sr.us ) * 1e-6;
+			if( t < 1.0 )
+				continue;//the first second primes earshot's floors
+			++n;
+			const int k      = static_cast< int >( std::floor( t / kLoopBeat + 1e-9 ) );
+			const double lag = t - k * kLoopBeat;
+			if( lag > late || k >= 16 )
+				++unmatched;
+			else
+			{
+				++hits[ static_cast< size_t >( k ) ];
+				worst = std::max( worst, lag );
+			}
+		}
+		for( int k = 0; k < 16; ++k )
+		{
+			const double at = k * kLoopBeat;
+			if( at < 1.0 || at + late > 6.0 - 1.0 / rig.fps )
+				continue;
+			++expected;
+			missed += hits[ static_cast< size_t >( k ) ] == 0;
+			doubled += hits[ static_cast< size_t >( k ) ] > 1;
+		}
+		if( run.rate != 48000 || !( parts & kLoopBass ) )
+			Check( std::fabs( hostRate - run.rate ) < 1e-9, fmt( "the host says %d Hz: earshot reads its bins at %.0f Hz", run.rate, hostRate ) );
+		const std::string line = fmt( "%s, %d Hz, 1..6 s: %d shakes for %d kicks; %d missed, %d doubled, latest %.1f ms after its kick "
+		                              "(limit %.1f); %d not within that of a kick",
+		                              run.what, run.rate, n, expected, missed, doubled, worst * 1e3, late * 1e3, unmatched );
+		if( parts & kLoopBass )
+			Check( n > 0 && missed == 0, line + " (counted, not refused: a held bass in bin 0 beats against the kick's tail)" );
+		else
+			Check( n > 0 && unmatched == 0 && missed == 0 && doubled == 0, line );
+	}
+	//A rate no engine runs at is not one: earshot keeps its 48 kHz.
+	{
+		Rig rig;
+		if( !startRig( rig, raster.w, raster.h, perturb ) )
+			return 1;
+		rig.plugin.SetSampleRate( 0u );
+		rig.Set( PT_TRIGGER_ON, static_cast< float >( TriggerOn::Kick ) );
+		if( !rig.Render( 2 ) )
+			return 1;
+		const double hostRate = rig.plugin.AudioForTest().HostRateForTest();
+		Check( std::fabs( hostRate - 48000.0 ) < 1e-9, fmt( "a host rate of 0: earshot keeps %.0f Hz (want 48000)", hostRate ) );
 	}
 	return Verdict();
 }

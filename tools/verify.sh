@@ -102,9 +102,9 @@ pin="$(git -C external/ffgl rev-parse --short=7 HEAD)"
 echo "ok   FFGL SDK pinned at $pin"
 # earshot is a snapshot, not a submodule: the commit it came from and that it
 # is unpatched are written in it, and AGENTS.md repeats both.
-command grep -q '^Commit:   8124191 ' external/earshot/SNAPSHOT || fail "external/earshot/SNAPSHOT is not earshot 8124191"
+command grep -q '^Commit:   02306da ' external/earshot/SNAPSHOT || fail "external/earshot/SNAPSHOT is not earshot 02306da"
 command grep -q '^Patches:  none' external/earshot/SNAPSHOT || fail "external/earshot/SNAPSHOT records a patch: AGENTS.md must say what and why"
-echo "ok   earshot snapshot 8124191, unpatched"
+echo "ok   earshot snapshot 02306da, unpatched"
 # The workflows: the repo is public (github.com/stoatworks-labs/snowglobe), so
 # it carries CI and the release build. Both must load the DLL the way a host
 # does, with the parameter count the plugin really declares (wincheck's
@@ -193,9 +193,9 @@ echo "ok   both workflows' wincheck ask for the $count parameters the plugin dec
 step "Checks (this Mac's GPU, 1280x720 and 320x180)"
 #---------------------------------------------------------------------------
 # Every claim the README makes. The picture checks run at both rasters
-# themselves; rate, clock, triggers and coreaudio measure time and the audio
-# path, and run at 320x180; model, names and cues need no GL context.
-CHECKS="fall settle swirl still grid magnify flakes rate clock resize alpha triggers coreaudio glstate robust model names cues"
+# themselves; rate, clock, triggers, hostfft and coreaudio measure time and
+# the audio path, and run at 320x180; model, names and cues need no GL context.
+CHECKS="fall settle swirl still grid magnify flakes rate clock resize alpha triggers hostfft coreaudio glstate robust model names cues"
 for check in $CHECKS; do
 	if out=$( "$SGTEST" --$check 2>&1 ); then
 		printf '   ok   sgtest --%s: %s checks\n' "$check" "$( printf '%s\n' "$out" | command grep -c '^  ok' )"
@@ -218,7 +218,7 @@ step "Software renderer (Apple's, at 320x180)"
 # another rasteriser? Its sin is off by up to 1.1e-3 (the fleet's trap: the
 # shader's own series is used; this shader calls neither sin nor atan), and
 # it is slow: every picture check runs on it, about six minutes. coreaudio
-# measures the audio path, not pictures, and runs on the GPU only.
+# and hostfft measure the audio path, not pictures, and run on the GPU only.
 SOFTWARE="fall settle swirl still grid magnify flakes rate clock resize alpha triggers glstate robust"
 for check in $SOFTWARE; do
 	if out=$( SGTEST_RENDERER=software "$SGTEST" --$check --size 320x180 2>&1 ); then

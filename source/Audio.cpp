@@ -125,6 +125,27 @@ void AudioInput::Release()
 	diag::info( "audio input closed: Trigger On is not Kick" );
 }
 
+void AudioInput::SetHostRate( unsigned int rate )
+{
+	if( rate < 8000 || rate > 768000 || rate == hostRate )
+		return;
+	hostRate         = rate;
+	earshot::Config c = makeConfig();
+	c.hostBins.sampleRate = static_cast< double >( rate );
+	engine->configure( c );
+	diag::info( "host audio at " + std::to_string( rate ) + " Hz: Resolume's FFT bins are " + std::to_string( rate / 128u ) + " Hz each" );
+}
+
+void AudioInput::SetHostCentreOnlyForTest( bool on )
+{
+	engine->mutations().hostCentreOnly = on;
+}
+
+double AudioInput::HostRateForTest() const
+{
+	return engine->config().hostBins.sampleRate;
+}
+
 const earshot::Frame& AudioInput::Update( double hostSeconds, const float* bins, int binCount )
 {
 	return engine->update( hostSeconds, bins, binCount );

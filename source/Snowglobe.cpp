@@ -241,6 +241,12 @@ void SnowglobePlugin::UpdateClock()
 		            + " seconds=" + std::to_string( seconds ) );
 }
 
+void SnowglobePlugin::SetSampleRate( unsigned int rate )
+{
+	CFFGLPlugin::SetSampleRate( rate );
+	hostRate.store( rate, std::memory_order_relaxed );
+}
+
 void SnowglobePlugin::SetBeatInfo( float newBpm, float newBarPhase )
 {
 	CFFGLPlugin::SetBeatInfo( newBpm, newBarPhase );
@@ -280,6 +286,12 @@ void SnowglobePlugin::handleKicks( int64_t frameStartUs, int64_t frameUs, std::v
 		refreshMenu();
 	audio.Want( params[ PT_INPUT ] );
 	audio.Apply();
+	//Resolume's 64 bins are linear to half the host's audio engine rate, 375 Hz
+	//each at 48 kHz, and earshot shares each between the bands it overlaps
+	//(earshot 0.1.1). Until the host sends a rate, earshot's 48 kHz.
+	if( !( cpuHooks & kCpuIgnoreHostRate ) )
+		audio.SetHostRate( hostRate.load( std::memory_order_relaxed ) );
+	audio.SetHostCentreOnlyForTest( ( cpuHooks & kCpuHostCentreOnly ) != 0 );
 	float bins[ kBins ] = {};
 	int binCount        = 0;
 	if( const ParamInfo* info = FindParamInfo( PT_AUDIO ) )

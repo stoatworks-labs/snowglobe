@@ -66,9 +66,11 @@ trace or the flake coverage (`source/Shaders.cpp`), the event times (`gatherEven
     `--flakes` (flakes at known 3D points: centroid and area against the trace).
   - **Time and host**: `--rate` (24/60/144 fps), `--clock` (499 million ms), `--resize`,
     `--alpha`, `--triggers` (button, beats inside the frame, kicks through earshot),
+    `--hostfft` (kicks from Resolume's FFT: a drum loop made into 64 bins the way Arena was
+    measured to make them, at 48 and 44.1 kHz; GPU only, not on the software renderer),
     `--coreaudio` (an interposer counts audio calls in a child), `--glstate`, `--robust`.
   - **No GL**: `--model`, `--names`, `--cues` (also under `--offline`).
-- The checks can fail: `./build/sgtest --negative` (27 wrong models), `tools/mutate.sh`
+- The checks can fail: `./build/sgtest --negative` (30 wrong models), `tools/mutate.sh`
   (46 one-character mutants, arm64, 320x180, perl alarm at 300 s; its own tree, never a shared
   one; `tools/mutate.sh TEXT` runs only those whose description contains TEXT).
 - No dead controls: `python3 tools/sweep.py --build build` (`--bare` drops the contexts).
@@ -113,7 +115,7 @@ trace or the flake coverage (`source/Shaders.cpp`), the event times (`gatherEven
   constructor nothing references.
 - The macOS build must be universal. Check with `lipo`, never the build log.
 - `external/earshot/` is a snapshot of earshot (`github.com/stoatworks-labs/earshot`) at
-  `8124191`, unpatched (`SNAPSHOT`). Never edit it here; change earshot upstream and take a new
+  `02306da`, unpatched (`SNAPSHOT`). Never edit it here; change earshot upstream and take a new
   snapshot. Its own CLAUDE.md and AGENTS.md are earshot's as of that commit, status lines and all.
 - **Generated, never edited here:** `source/StoatworksAbout.h` (stoatworks-backend's
   `sync-about.py`, from the website's projects.json) and `ATTRIBUTIONS.md` (`sync-attributions.py`,

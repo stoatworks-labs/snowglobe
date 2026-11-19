@@ -12,6 +12,7 @@
 #include "StoatworksAboutParams.h"
 
 #include <cstdint>
+#include <atomic>
 #include <vector>
 
 namespace snowglobe
@@ -29,7 +30,9 @@ enum CpuHook : int
 	kCpuFlakesStraight  = 1 << 6,///< flakes projected without refraction
 	kCpuAnyBand         = 1 << 7,///< a kick from any band, not the lowest
 	kCpuDropPresses     = 1 << 8,///< presses between two frames collapse to one
-	kCpuNoDominance     = 1 << 9 ///< a band-0 onset is a kick whatever the other bands carry
+	kCpuNoDominance     = 1 << 9, ///< a band-0 onset is a kick whatever the other bands carry
+	kCpuIgnoreHostRate  = 1 << 10,///< the host's sample rate never reaches earshot's host-bin law
+	kCpuHostCentreOnly  = 1 << 11 ///< each host bin filed whole under the band holding its centre (earshot 8124191's rule)
 };
 
 /// Kicks are earshot onsets in this band only (40-160 Hz).
@@ -84,6 +87,9 @@ public:
 	FFResult SetTextParameter( unsigned int index, const char* value ) override;
 	FFResult SetTime( double time ) override;
 	void SetBeatInfo( float bpm, float barPhase ) override;
+	/// The host's audio engine rate: the axis of its FFT buffer (earshot's
+	/// AGENTS.md, "Resolume's 64 bins, measured"). Arena sends 48000.
+	void SetSampleRate( unsigned int rate ) override;
 
 	int HostIndexOf( unsigned int id ) const
 	{
@@ -178,6 +184,9 @@ private:
 	int64_t lastKickUs = INT64_MIN / 2;
 	uint32_t lastOnsetCount[ earshot::kMaxBands ] = {};
 	bool onsetsPrimed = false;
+	/// SetSampleRate's, 0 until the host sends one. Atomic: a host may call
+	/// SetSampleRate from another thread than the frame's.
+	std::atomic< unsigned int > hostRate { 0 };
 
 	//The beat (marbling's): the host's bar phase, or a clock of our own.
 	float bpm          = 120.0f;

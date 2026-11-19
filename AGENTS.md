@@ -8,25 +8,30 @@ departs from it).
 
 ## Status
 
-**v0.1.0, 2026-11-17; public at `github.com/stoatworks-labs/snowglobe` from 2026-11-18.**
-`OXBOW=… TMPDIR=… tools/verify.sh` passes on this
-Mac (Apple Silicon) against a fresh universal Release build: 102 checks at 1280x720 and
+**v0.1.1, 2026-11-19: Kick on Resolume's FFT fires** (v0.1.0, public from 2026-11-18, never
+fired it). `OXBOW=… TMPDIR=… tools/verify.sh` passes on this
+Mac (Apple Silicon) against a fresh universal Release build: 109 checks at 1280x720 and
 320x180, every picture check again on Apple's software renderer at 320x180, `--offline` with
 no GL context, the box rule against `--flakes`' tolerances, Arena's two DXV alpha clips and the
-defaults' measurement through `--pipe`, the pipe, 27 of 27 negative controls, 46 of 46
+defaults' measurement through `--pipe`, the pipe, 30 of 30 negative controls, 46 of 46
 mutants, 10 of 10 controls alive in the sweep and in the bare sweep, oxbow reading and
-rendering the bundle with devices disabled. **In Resolume only on Windows**: Arena 7.27.1 on
+rendering the bundle with devices disabled. **Windows**: Arena 7.27.1 on
 win-lab (llvmpipe, no sound device), the fleet's gate on the release workflow's DLL, 9 passed,
 0 failed, 2 skipped (Audio Input and Audio need sound; Shake Now inert), on a pre-tag build and
 again on the v0.1.0 zip's own DLL (a different hash). **Arena 7.29.0 on
 this Mac (2026-11-19)**, the v0.1.0 zip's bundle over REST: registers, 18 controls as declared,
 still at rest, every control acts, Beat shakes it on Arena's clock and Shake Now on a press;
-**Kick never fired on Resolume's FFT** with `Beat 001.wav` playing below (0 of 69 pairs at
-Shake 0.3, 0 of 41 at 1.0), because earshot's host path puts bin j at (j + 0.5)/64 of 22.05 kHz,
-bin 0 at 172 Hz, so band 0 (40–160 Hz) gets no bin and never onsets (README "In Resolume");
-**no live audio device ever opened.** MSVC compiles
+Kick never fired on Resolume's FFT with `Beat 001.wav` playing below (0 of 69 pairs at
+Shake 0.3, 0 of 41 at 1.0): earshot `8124191` put bin j at (j + 0.5)/64 of 22.05 kHz and gave
+each bin to the band holding its centre, so band 0 (40–160 Hz) got no bin. **v0.1.1 on the
+same Mac, the same day** (a universal bundle from the v0.1.1 source, before the tag): **Kick
+moved the globe in 69 of 69 pairs at Shake 0.3 and 40 of 40 at 1.0 with `Beat 001.wav`**, 0 of
+24 before the loop, at rest again after it; `Bass 001.wav` (no drums) shook it too, 40 of 40,
+because Resolume's bin 0 is 0–375 Hz ("Resolume's FFT, measured" below); Beat 24 of 24, Shake
+Now 0 of 9 unpressed and 24 of 24 after one press; the log reads "host audio at 48000 Hz".
+**No live audio device ever opened.** MSVC compiles
 snowglobe and earshot with no warnings (CI). earshot is a snapshot of
-`github.com/stoatworks-labs/earshot` at `8124191`, unpatched. A user guide (`docs/USER-GUIDE.md`)
+`github.com/stoatworks-labs/earshot` at `02306da`, unpatched. A user guide (`docs/USER-GUIDE.md`)
 and a browser demo ("Browser demo" below); no OpenFX port.
 **Flashes:** the release's survey (33 demo clips, 20 s each at 60 fps, music through `--wav`,
 the fleet's flashcheck) found none over the line at the defaults (worst window 5 transitions in
@@ -97,6 +102,16 @@ published, and the harness measures each off the rendered pixels.
   low-frequency splatter fired band 0 once the kicks stopped (band-0 level 3.9e-4 against band
   3's 0.022), and the globe never stayed still on hats. Kicks within 50 ms are one. Each is
   placed at hostNow − (audioTime − lastOnsetTime), clamped inside the frame.
+- **Resolume's FFT (v0.1.1).** The host's bins are read with earshot's default law, Arena's
+  measured one (Magnitude, Linear), and the sample rate FFGL's `SetSampleRate` reports: the
+  plugin overrides it, keeps the rate in an atomic, and hands it to earshot on the render
+  thread before the bins are read (`AudioInput::SetHostRate`; a rate outside 8–768 kHz, or
+  none, leaves earshot's 48 kHz). A rate change is logged once ("host audio at 48000 Hz:
+  Resolume's FFT bins are 375 Hz each"). No control for the law: snowglobe never had one, and
+  woofer and rubens are where a user can change it. earshot shares each bin among the bands it
+  overlaps, so band 0 is 0.32 of bin 0 (0–375 Hz): **on the host path Kick is the low end**,
+  bass notes and kick/bass beating included. The dominance gate and the 50 ms merge are
+  unchanged.
 - **Beat.** Each quarter of the bar is a shake at Shake's strength, the crossing interpolated
   inside the frame (ferrofluid's, by way of marbling); a bar phase that never moves gets the
   plugin's own clock at the last BPM.
@@ -127,6 +142,36 @@ published, and the harness measures each off the rendered pixels.
   was public snowglobe shipped none, so nothing could run by accident; `ci.yml` and
   `release.yml` came with the public repo (woofer's, from mirrorball's CI and filings' release,
   with `wincheck.ps1`).
+
+## Resolume's FFT, measured
+
+Measured in Arena 7.29.0 on this Mac on 2026-11-19 with SW Hostprobe; earshot's AGENTS.md
+("Resolume's 64 bins, measured") has the probe and every number. What snowglobe depends on:
+
+- **64 linear bins of 375 Hz, 0–24 kHz**: bin j is [j, j+1) × 375 Hz, 1/64 of the Nyquist of
+  the audio engine's 48 kHz. A 44.1 kHz clip reads the same bins; FFGL `SetSampleRate` says
+  48000 (snowglobe's log in Arena: "host audio at 48000 Hz: Resolume's FFT bins are 375 Hz
+  each").
+- **Magnitude, linear in amplitude** (×1000 over 60 dB; a sine of amplitude A reads 0.25–0.263
+  A), mono (L+R)/2, silence exactly 0.
+- **A new spectrum about every 43 ms** (2048 samples at 48 kHz), held between updates.
+- Grouping inferred, not seen: a tone on a bin edge splits 1:3, which fits each bin being the
+  sum of 16 fine bins of a 2048-point Hann FFT. `--hostfft` builds its bins that way.
+- `Beat 001.wav` in bin 0: mean 0.0199, peak 0.109. A kick, the bass and the low toms all land
+  in bin 0, and 64 linear bins can't separate them.
+
+`--hostfft` feeds a 128 BPM loop (a kick, claps on 2 and 4, hats on the eighths, the claps and
+hats high-passed so they carry next to nothing below 375 Hz) through that model into the
+plugin's FFT buffer, with `SetSampleRate` called as Arena calls it: 10 of 10 kicks shake it at
+48 kHz (latest 60.4 ms after its kick, limit 102.0: two spectra and a frame) and at 44.1 kHz
+(62.5 ms, limit 109.5); claps and hats alone, none; over a held 49 Hz bass, no kick missed (14
+shakes for 10 kicks, 4 of them the bass's). It also reads the host rate back from earshot (48000,
+44100, and 48000 kept when the host sends 0). Built against earshot `8124191` the check fails,
+0 of 10.
+
+Replaying Arena's own recorded bins for `Beat 001.wav` (30 beats) through earshot `02306da` and
+snowglobe's rule: 30 of 30 beats shake it, plus 18 shakes 130–155 ms after a beat (the loop's
+low notes, or kick and bass beating, in bin 0). Through `8124191`'s rule: 0.
 
 ## Defaults
 
@@ -210,6 +255,15 @@ cap's GPU cost as 1–1.3 ms. Not measured: 4K
   spec and also measures the radius off the alpha (324.012 px against 324).
 - **A citation from memory in the harness.** `--model` said "Hecht's paraxial n"; Hecht was
   never reached. Now OpenStax eq. 2.11.
+- **Kick never fired on Resolume's FFT** in v0.1.0, and nothing offline could show it: every
+  kick check fed earshot the waveform through `feed()`, and `--silent` fed the host path
+  nothing. The host path's layout was never checked against a host. `--hostfft` now feeds
+  bins built the way Arena was measured to build them.
+- **A truncated sample index breaks a high-pass.** `--hostfft`'s hiss is a second difference
+  of hashed noise; indexing it by `(long)(t * rate)` repeats and skips samples at 60 fps, and
+  the repeats put energy back below 375 Hz (a stray shake at 5.167 s on claps and hats alone).
+  `llround(t * rate)` fixed it. `musicAt`'s own index still truncates; nothing it feeds
+  depends on a high-pass.
 - **On arm64, long double is double.** The harness's trace "in long double" is double here; its
   tolerances are written for double.
 - The machine's: heredocs hang without TMPDIR (verify.sh refuses to run without one); no
@@ -219,7 +273,7 @@ cap's GPU cost as 1–1.3 ms. Not measured: 4K
 
 ## Verified, and assumed
 
-Verified, by `tools/verify.sh` on 17 November 2026: every claim in README's Status, at
+Verified, by `tools/verify.sh` on 17 November 2026 and again for v0.1.1 on 19 November: every claim in README's Status, at
 1280x720 and 320x180 on this Mac's GPU, every picture check again on Apple's software renderer
 at 320x180; the CPU checks with no GL context; the alpha check on Arena's DXV clips; the
 negative controls and mutants; the sweep, and `--bare`; the bundle universal, signed ad hoc,
@@ -229,11 +283,13 @@ Assumed: Stokes drag (Re → 0) up to Re 0.63 at the worst corner, where [Mercie
 extrapolated below its range, puts the true drag ~10 % higher; discs that keep their
 orientation; the slowest mode only, linear; the shake (Ω_max, the lift); the geometry (R, D,
 the card at the centre); 20 °C; n at the sodium D line; Resolume's FFT onsets usable
-(earshot's host fallback is frame-quantised and uncalibrated; for Kick they never come in
-v0.1.0, since band 0 gets no host bin).
+(earshot's host fallback is quantised to Arena's ~43 ms updates and the frame, and
+uncalibrated); `--hostfft`'s model of Arena's grouping (16 fine bins of a 2048-point Hann FFT
+summed) is inferred from the measurement, not seen; the law measured on one Mac, in Arena
+7.29.0 only (Windows, Avenue and other versions not measured).
 
-Not done: Kick on Resolume's FFT (it can't fire in v0.1.0: README "In Resolume"); a live
-device; presets, an OpenFX port; a 4K bench.
+Not done: Kick from a live device; Kick on Resolume's FFT on Windows (win-lab has no sound
+device); presets, an OpenFX port; a 4K bench.
 
 ## Would this hold on another rasteriser, at another raster?
 
@@ -274,7 +330,7 @@ renderer at 320x180, run by verify.sh):
 
 ## The negative controls and mutants
 
-`sgtest --negative`, 27 wrong models, each must fail its check; a check with none fails:
+`sgtest --negative`, 30 wrong models, each must fail its check; a check with none fails:
 
 | check | wrong model |
 | --- | --- |
@@ -297,6 +353,9 @@ renderer at 320x180, run by verify.sh):
 | `--triggers` | beats and kicks placed at the frame, not inside it |
 | `--triggers` | a kick from any band, not the lowest |
 | `--triggers` | a band-0 onset a kick whatever the other bands carry |
+| `--hostfft` | Resolume's bins filed whole under the band holding each one's centre (earshot `8124191`'s rule): band 0 gets none |
+| `--hostfft` | the host's sample rate never reaches earshot |
+| `--hostfft` | a kick from any band, not the lowest |
 | `--coreaudio` | the device menu listed and Audio Input applied whatever Trigger On says |
 | `--glstate` | the composite leaves its program and textures bound |
 | `--robust` | presses between two frames collapse to one |
@@ -479,11 +538,14 @@ https://snowglobe-demo.stoatworks-labs.com/ (2026-11-18), from `demo/`, deployed
    "time scale" control that is honest about being one.
 3. **Outside the globe is transparent.** An option to keep the clip around the globe (or a
    backdrop) was left out.
-4. **The kick gate's 0.25** is chosen against the harness's own music. **Kick on Resolume's
-   FFT never fires in v0.1.0** (Arena 7.29.0, 2026-11-19): earshot's Linear host layout centres
-   bin 0 at 172 Hz, above band 0's 160 Hz edge, so the kick band is empty on the host path. A
-   fix (a kick band that reaches the lowest host bin, or a host-path rule of its own) is code,
-   for after v0.1.0, and open.
+4. **The kick gate's 0.25** is chosen against the harness's own music. *Closed in v0.1.1:*
+   Kick on Resolume's FFT never fired in v0.1.0 (Arena 7.29.0, 2026-11-19) because earshot
+   `8124191` gave bin 0 (centred at 172 Hz) to the band above the kick band. Resolume's bins
+   were measured (below), earshot `02306da` shares each bin by overlap, and v0.1.1 fires in
+   Arena: 69 of 69 pairs with `Beat 001.wav`. Still open: on the host path Kick is 0–375 Hz,
+   so a bass line shakes the globe too (40 of 40 pairs with `Bass 001.wav`). A gate against
+   that (a kick is band 0 rising while bins 1–2 don't, say) would be a new choice, not
+   measured.
 5. **Ω_max = 2 rad/s and the lift height 2R·S** are chosen; no source models a hand's shake.
 6. **No base, no figurine, no glass, no Fresnel**: the outer 9 % of the card is never seen, and
    the last pixels of the globe hold a squeezed ring with no reflection.

@@ -30,7 +30,10 @@ class CaptureBackend;
 
     **Resolume's FFT** (element 0, the default): earshot's host fallback gives
     band onsets once a frame, frame-quantised and uncalibrated (earshot's
-    INTEGRATING.md). **A device**: earshot's capture, its onsets timed on the
+    INTEGRATING.md). Arena's 64 bins are 375 Hz each, so the kick band
+    (40-160 Hz) is 0.32 of bin 0, which also holds the bass: earshot shares
+    each bin between the bands it overlaps (from earshot 0.1.1; 8124191 gave
+    bin 0 whole to 160-640 Hz, and Kick never fired). **A device**: earshot's capture, its onsets timed on the
     audio clock inside the frame.
 
     The device menu follows rubens/spasis: element 0 = 0, element 1 =
@@ -79,6 +82,10 @@ public:
 	/// Under Beat or Button: close a device that is open (nothing if none is).
 	void Release();
 
+	/// The host's audio engine rate (FFGL SetSampleRate), the axis of its FFT
+	/// bins. Applied when it changes; 0, or a rate no engine runs at, keeps
+	/// what earshot has (48 kHz until a host says otherwise).
+	void SetHostRate( unsigned int rate );
 	/// Analyse this frame. `hostSeconds` is the plugin's clock.
 	const earshot::Frame& Update( double hostSeconds, const float* bins, int binCount );
 	const earshot::Frame& Frame() const;
@@ -90,6 +97,11 @@ public:
 	//-- Harness ------------------------------------------------------------------
 	/// Audio as if from a device, without one: earshot's feed().
 	void Feed( const float* interleaved, int frames, int rate, int channels );
+	/// earshot's negative control for the host path: each bin whole to the
+	/// band holding its centre (snapshot 8124191's rule).
+	void SetHostCentreOnlyForTest( bool on );
+	/// The rate earshot reads the host's bins at.
+	double HostRateForTest() const;
 
 private:
 	std::unique_ptr< earshot::Engine > engine;
@@ -99,6 +111,7 @@ private:
 	std::string applied;///< the name earshot was last given ("" none)
 	bool listed         = false;
 	bool feeding        = false;
+	unsigned int hostRate = 0;///< the last rate handed to earshot, 0 none
 };
 
 } // namespace snowglobe

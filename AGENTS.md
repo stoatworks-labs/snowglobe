@@ -17,7 +17,8 @@ defaults' measurement through `--pipe`, the pipe, 27 of 27 negative controls, 46
 mutants, 10 of 10 controls alive in the sweep and in the bare sweep, oxbow reading and
 rendering the bundle with devices disabled. **In Resolume only on Windows**: Arena 7.27.1 on
 win-lab (llvmpipe, no sound device), the fleet's gate on the release workflow's DLL, 9 passed,
-0 failed, 2 skipped (Audio Input and Audio need sound; Shake Now inert). **Never loaded into
+0 failed, 2 skipped (Audio Input and Audio need sound; Shake Now inert), on a pre-tag build and
+again on the v0.1.0 zip's own DLL (a different hash). **Never loaded into
 Arena on a Mac** (Arena was in use there at release and was left alone), so Resolume's FFT has
 never been seen giving Kick its kicks; **no live audio device ever opened.** MSVC compiles
 snowglobe and earshot with no warnings (CI). earshot is a snapshot of

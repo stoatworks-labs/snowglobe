@@ -37,6 +37,38 @@ are scattered through the whole globe after a shake](docs/hero.png)
 colour card at the defaults, 3.5 s after one press of Shake Now (`--frames 240 --set
 "Trigger On=Button" --at 30 "Shake Now=1"`). Outside the globe the frame is transparent.</sub>
 
+<!-- downloads:start -->
+
+## Download
+
+**[v0.1.0](https://github.com/stoatworks-labs/snowglobe/releases/tag/v0.1.0)** — prebuilt for macOS and Windows. Pick your platform:
+
+<details>
+<summary><b>macOS</b> — Universal (Apple Silicon + Intel)</summary>
+
+| Build | Download | Size |
+| --- | --- | --- |
+| Universal (Apple Silicon + Intel) · .dmg disk image | [`snowglobe-0.1.0-macos-universal.dmg`](https://github.com/stoatworks-labs/snowglobe/releases/download/v0.1.0/snowglobe-0.1.0-macos-universal.dmg) | 598 KB |
+| Universal (Apple Silicon + Intel) · .zip archive | [`snowglobe-macos-universal.zip`](https://github.com/stoatworks-labs/snowglobe/releases/latest/download/snowglobe-macos-universal.zip) | 535 KB |
+
+</details>
+
+<details>
+<summary><b>Windows</b> — x64</summary>
+
+| Build | Download | Size |
+| --- | --- | --- |
+| x64 · .exe installer | [`snowglobe-0.1.0-windows-x86_64-setup.exe`](https://github.com/stoatworks-labs/snowglobe/releases/download/v0.1.0/snowglobe-0.1.0-windows-x86_64-setup.exe) | 361 KB |
+| x64 · .zip archive | [`snowglobe-windows-x86_64.zip`](https://github.com/stoatworks-labs/snowglobe/releases/latest/download/snowglobe-windows-x86_64.zip) | 251 KB |
+
+</details>
+
+All builds, checksums and release notes: [github.com/stoatworks-labs/snowglobe/releases](https://github.com/stoatworks-labs/snowglobe/releases).
+
+macOS builds are signed and notarised and open normally. The Windows builds are unsigned, so SmartScreen warns once.
+
+<!-- downloads:end -->
+
 ## The one idea
 
 **A snow globe is a slow, viscous, settling flow seen through one curved surface.** The flakes
@@ -115,8 +147,9 @@ No OpenFX port; a [browser demo](#browser-demo) and a [user guide](https://stoat
 ### In Resolume
 
 - **Windows: Arena 7.27.1 on win-lab** (Mesa llvmpipe, no GPU, no sound device), with the x64 DLL
-  the release workflow built from this source: the fleet's Arena gate passed 9 checks, failed none
-  and skipped 2. It loads, registers as `SW Snowglobe` / `SG01`, an effect, shows all 18 controls
+  the release workflow built from this source, once from a build before the tag and again from the
+  v0.1.0 release's own zip (the two DLLs differ by hash): the fleet's Arena gate passed 9 checks,
+  failed none and skipped 2, both times. It loads, registers as `SW Snowglobe` / `SG01`, an effect, shows all 18 controls
   (Opacity and the 17 declared) with the declared name, order, type, range and default, renders,
   and 10 controls move the picture: with no sound the snow lies still on the glass, where Fill,
   Snow, Size, Range, Count, Globe and Mix act, and Shake acts under Trigger On at Beat, shaking on

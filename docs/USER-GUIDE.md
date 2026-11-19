@@ -28,11 +28,12 @@ transparent.*
 > the snow has landed, 300 frames of music with no kick are identical to the bit. Twenty-seven
 > models that are wrong on purpose and forty-six one-character changes to the shipped code are all
 > caught.
-> In Resolume it has run only in Arena 7.27.1 on Windows, on software rendering with no sound
-> device, on one layer over a still: there it registers, shows its controls with the declared
-> defaults and renders, and every control that acts on a still globe changes the picture.
-> **It has never been loaded into Arena on a Mac**, and **Resolume's own spectrum has never been
-> seen shaking it**.
+> In Resolume it has run only briefly, on one layer over a still, in Arena 7.29.0 on a Mac and
+> 7.27.1 on Windows (software rendering, no sound device): it registers, shows its controls with
+> the declared defaults and renders, every control that acts on a still globe changes the
+> picture, and **Beat** and the **Shake Now** button shake it. **But Kick, the default trigger,
+> never fires on Resolume's own spectrum in this version** (see
+> [Where the audio comes from](#where-the-audio-comes-from)): use Beat or the button.
 > **No live audio input has ever been opened**, and it has **never been in a show**. The globe's
 > size, how hard a shake is and how high it throws the snow are chosen, not measured (see
 > [Known limits](#known-limits)). Try it on a spare layer before you put it in a show.
@@ -79,12 +80,12 @@ it trips SmartScreen once: **More info** → **Run anyway**. Or skip the install
    over whatever is on the layers below. With nothing below, Resolume shows black there.
 3. **Shake it by hand first.** Set **Trigger On** to **Button** and press **Shake Now**: the snow
    jumps, the fill swirls, and the flakes drift down again over the next tens of seconds.
-4. **Give it music.** Set **Trigger On** back to **Kick**, the default. With **Audio Input** at
-   **Resolume FFT**, the default, Snowglobe listens for kick drums in Resolume's own spectrum of
-   the composition's audio (the **Audio** control picks which audio, as on any Resolume effect).
-   Or pick an audio input by name in **Audio Input**. Each kick shakes the globe at **Shake**'s
-   strength.
-5. **Or shake it on the beat.** **Trigger On** at **Beat** shakes it on every beat of
+4. **Kick, the default trigger, doesn't hear Resolume's spectrum yet.** **Trigger On** at
+   **Kick** listens for kick drums, but with **Audio Input** at **Resolume FFT**, the default, it
+   never hears one in this version (see [Where the audio comes from](#where-the-audio-comes-from)),
+   so the globe stays still. With an audio input picked by name in **Audio Input**, each kick
+   should shake the globe at **Shake**'s strength, but that hasn't been tried in Resolume.
+5. **Shake it on the beat.** **Trigger On** at **Beat** shakes it on every beat of
    Resolume's clock, music or not.
 
 The defaults: Shake 0.3, Trigger On Kick, Audio Input Resolume FFT; a fill of 60 % glycerol;
@@ -181,10 +182,15 @@ Shake Now straight after a run of kicks lifts less than it would on a settled gl
 Snowglobe never touches the audio system at all, whatever Audio Input says.
 
 - **Resolume FFT** (the default): Resolume's own spectrum of the composition's audio, which every
-  effect gets. The **Audio** control chooses which audio, as on any Resolume effect. This is a
-  coarse feed: a spectrum once a frame, so a kick is placed to the frame, and nobody has measured
-  how Resolume's spectrum of a real mix behaves here. It has never been
-  tried on Resolume's spectrum of real music: the one Arena it has run in, on Windows, had no sound.
+  effect gets. **In this version Kick never fires on it.** Snowglobe reads Resolume's 64
+  bands as evenly spread up to 22 kHz, so the lowest is centred at 172 Hz, above the top of its
+  kick band (40–160 Hz), and the kick band is always empty. In Arena 7.29.0 on a Mac, with
+  Resolume's demo drum loop `Beat 001.wav` playing on the layer below, the globe never moved
+  under Kick, at any Shake; switched to Beat, it shook. Resolume's **Audio** control
+  (Composition, every clip in the composition; Local, only the clip Snowglobe is on; External,
+  Resolume's own audio input) chooses which audio that spectrum is of, which makes no difference
+  to Kick while it can't hear it. It is a coarse feed in any case: a spectrum once a frame, so a
+  kick would be placed to the frame.
 - **System default**, or **an input by name**: Snowglobe listens to that input itself, and a kick
   is placed by the input's own clock inside the frame, within one analysis window (about 27 ms). The menu remembers the input by name, so a
   composition reopened on another day finds the same device, and a device that has gone is shown
@@ -279,9 +285,10 @@ The CPU side is the snow, the swirl and the audio analysis, and it doesn't depen
 
 ## If it looks wrong
 
-**Nothing moves.** That's the snow at rest, waiting for a shake. Under **Kick**, no kick is
-reaching it: check the **Audio** control's source is playing something with a kick, or pick an
-input in **Audio Input**. Press **Shake Now** to check the rest works. Under **Button**, only
+**Nothing moves.** That's the snow at rest, waiting for a shake. Under **Kick** on **Resolume
+FFT**, that's this version: Kick never hears Resolume's spectrum (see
+[Where the audio comes from](#where-the-audio-comes-from)); use **Beat**, or pick an input in
+**Audio Input**. Press **Shake Now** to check the rest works. Under **Button**, only
 Shake Now shakes it.
 
 **The snow stays low.** That's the shake lifting only snow that has landed. Steady kicks keep
@@ -309,12 +316,14 @@ Windows  %LOCALAPPDATA%\snowglobe\logs\snowglobe.YYYY-MM-DD.log
 
 ## Known limits
 
-- **Run in Resolume only briefly**, in Arena 7.27.1 on Windows (software rendering, no sound
-  device), on one layer over a still: it loads, registers and shows its controls as declared,
-  renders, and the controls that act on a still globe change the picture (Shake with Trigger On
-  at Beat). It has **never been loaded into Arena on a Mac**, and **never been seen shaking to
-  Resolume's own spectrum** of real music. Nothing is known about a whole show, or how it performs
-  inside Resolume.
+- **Run in Resolume only briefly**, on one layer over a still, in Arena 7.29.0 on a Mac and
+  7.27.1 on Windows (software rendering, no sound device): it loads, registers and shows its
+  controls as declared, renders, holds still at rest, the controls that act on a still globe
+  change the picture, and Beat and Shake Now shake it. Nothing is known about a whole show, or
+  how it performs inside Resolume.
+- **Kick never fires on Resolume FFT in this version**: its kick band, 40–160 Hz, lies below the
+  lowest of Resolume's bands as Snowglobe reads them. Use Beat or Button with Resolume's
+  spectrum; Kick on an audio input hasn't been tried in Resolume.
 - **No live audio input has been opened**, by Snowglobe or by the audio library inside it, on
   any machine. Kicks are proved on audio fed through the same path in the harness. Try your input
   before a show.

@@ -2,9 +2,10 @@
 
 > **AI-assisted project.** This codebase was created with [Claude](https://claude.com/claude-code)
 > (Anthropic), directed and reviewed by a human author. **It has run in Resolume only briefly,
-> in Arena 7.27.1 on Windows on one layer over a still with no sound device, it has never been
-> loaded into Arena on a Mac, and it has never opened a live audio device: it has never been
-> seen shaking to music inside Resolume.** What's established is established
+> on one layer over a still, in Arena 7.29.0 on a Mac and 7.27.1 on Windows, and it has never
+> opened a live audio device. In Arena on the Mac, Beat and the Shake Now button shake it, but
+> its default trigger, Kick, never fires on Resolume's own FFT: in v0.1.0 the kick band gets
+> none of Resolume's spectrum (see [In Resolume](#in-resolume)).** What's established is established
 > by an offline harness, `sgtest`, that drives the real plugin class through the same
 > `ProcessOpenGL` a host calls, in a headless GL context on a synthetic clock, on this Mac's GPU
 > at 1280x720 and 320x180 and on Apple's software renderer, and feeds it audio through the same
@@ -105,7 +106,8 @@ much the glass magnifies the clip.
 ## Triggers
 
 - **Kick** (the default): kick drums, from [earshot](https://github.com/stoatworks-labs/earshot)'s lowest band (40–160 Hz). Resolume's FFT by
-  default, or a capture device. Kicks within 50 ms are one shake.
+  default, or a capture device. Kicks within 50 ms are one shake. **On Resolume's FFT it never
+  fires in v0.1.0** (see [In Resolume](#in-resolume)): use Beat or Button there.
 - **Beat**: each quarter of Resolume's bar, placed inside the frame.
 - **Button**: Shake Now only. Shake Now is a full shake, and works under every source.
 
@@ -132,8 +134,9 @@ the snow behind the card). Mix 0 hands the clip through bit for bit.
 
 ## Status
 
-**v0.1.0, 18 November 2026. Run in Resolume only briefly, in Arena on Windows over a still with
-no sound device; never loaded into Arena on a Mac, and no live audio device ever opened.**
+**v0.1.0, 18 November 2026. Run in Resolume only briefly, over a still, in Arena on Windows and
+on a Mac; on Resolume's FFT the Kick trigger never fires (Beat and Button do), and no live audio
+device has ever been opened.**
 No OpenFX port; a [browser demo](#browser-demo) and a [user guide](https://stoatworks-labs.com/software/snowglobe/guide/).
 
 > **Photosensitivity.** At the defaults it added no flash to any of Resolume's 33 demo clips.
@@ -157,11 +160,29 @@ No OpenFX port; a [browser demo](#browser-demo) and a [user guide](https://stoat
   Now is recorded inert (the gate presses no buttons). Arena's log was clean and it survived the
   run. The MSVC build of snowglobe and of earshot has no warnings, and `tools/wincheck.ps1` loads
   the DLL as a host does and reads back its 17 parameters.
-- **macOS: never loaded into Arena.** Arena was already in use on the release Mac, and was left
-  alone. So **Resolume's own FFT has never been seen shaking the globe**: with Audio Input at
-  Resolume FFT, the default, whether Resolume's spectrum of a real mix gives the Kick trigger its
-  kicks is unknown. Beat and Button don't depend on it; Beat was seen shaking the globe in Arena on
-  Windows.
+- **macOS: Arena 7.29.0 on an Apple Silicon Mac** (19 November 2026), with the v0.1.0 release's
+  own universal bundle from its zip, mounted over Arena's REST API on an opaque card in a new
+  composition and read off the composition monitor in snapshots about a fifth of a second
+  apart. It registers as `SW Snowglobe` / `SG01`, an effect, and shows all 18 controls (Opacity
+  and the 17 declared) with the declared name, order, type, range and default; the About line
+  reads "Snowglobe v0.1.0 - MIT - Stoatworks Labs, stoatworks-labs.com". **At rest it holds
+  still**: two snapshots 2 s apart were identical, and Mix 0 was identical to the bare card.
+  **Each control acts**: Fill, Snow, Size, Range, Count, Globe and Mix each changed the picture
+  (by 2.4 to 90.9 levels on average) and, set back, gave the first picture again, identical.
+  **Beat**, on Arena's clock: Shake 0 moved nothing (0 of 24 snapshot pairs), the default 0.3
+  shook it in 23 of 24 and 1.0 in 24 of 24. **Button**: once the snow had settled, nothing moved
+  without a press, and one Shake Now press over REST (held 0.3 s) changed 24 of 24 pairs. The
+  plugin listed 12 audio inputs on its first frame under Kick and opened none; no microphone
+  prompt appeared, and Arena's composition files were left as they were.
+- **Kick never fired on Resolume's FFT.** With Arena's demo loop `Beat 001.wav` (the sound
+  file) playing on the layer below, the Audio buffer on Composition and Audio Input on Resolume
+  FFT, the globe didn't move in 69 snapshot pairs over 14.6 s at the default Shake, nor in 41 at
+  Shake 1.0, nor with Arena's `Bass 001.wav`, nor on Local or External; switched to Beat with
+  the same loop playing, it shook in 19 of 19. The reason is in the code, not the set-up:
+  earshot reads Resolume's 64 FFT bins as evenly spread up to 22.05 kHz, so the lowest is
+  centred at 172 Hz, above the top of the kick band (40–160 Hz), and the kick band never gets a
+  bin. **So in v0.1.0 Kick on Resolume FFT never shakes the globe**; use Beat or Button, or an
+  audio input (never tried in Resolume).
 - It has never been in a show, and nothing was timed inside Resolume.
 
 ### Measured offline, on macOS
@@ -229,10 +250,10 @@ Each check names its tolerance and where the tolerance comes from; AGENTS.md has
 - Only the swirl's slowest mode, linear: no secondary circulation, no inertial waves.
 - No glass wall, no reflections, no meniscus or bubble, no base or figurine; rays through
   transparent parts of the clip leave unrefracted.
-- **Never seen shaking to music inside Resolume.** Resolume's FFT has never been tried (above),
-  and no live audio device has been opened. Resolume's FFT is a coarse feed: a spectrum once a
-  frame, so a kick is placed to the frame, and the kick gate (a quarter of the loudest band) was
-  set on the harness's music.
+- **Never seen shaking to a kick inside Resolume.** On Resolume's FFT the Kick trigger can't
+  fire in v0.1.0 (above), and no live audio device has been opened. Resolume's FFT is a coarse
+  feed in any case: a spectrum once a frame, so a kick is placed to the frame, and the kick gate
+  (a quarter of the loudest band) was set on the harness's music.
 - **Chosen, not measured, and open:** a shake lifts only flakes at rest, so under steady kicks
   the snow stays in the lower part of the globe; settling takes tens of seconds (25 s after a
   lift-only shake at the defaults), as real globes do, and no faster fill stays in Stokes;

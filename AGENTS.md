@@ -18,9 +18,13 @@ mutants, 10 of 10 controls alive in the sweep and in the bare sweep, oxbow readi
 rendering the bundle with devices disabled. **In Resolume only on Windows**: Arena 7.27.1 on
 win-lab (llvmpipe, no sound device), the fleet's gate on the release workflow's DLL, 9 passed,
 0 failed, 2 skipped (Audio Input and Audio need sound; Shake Now inert), on a pre-tag build and
-again on the v0.1.0 zip's own DLL (a different hash). **Never loaded into
-Arena on a Mac** (Arena was in use there at release and was left alone), so Resolume's FFT has
-never been seen giving Kick its kicks; **no live audio device ever opened.** MSVC compiles
+again on the v0.1.0 zip's own DLL (a different hash). **Arena 7.29.0 on
+this Mac (2026-11-19)**, the v0.1.0 zip's bundle over REST: registers, 18 controls as declared,
+still at rest, every control acts, Beat shakes it on Arena's clock and Shake Now on a press;
+**Kick never fired on Resolume's FFT** with `Beat 001.wav` playing below (0 of 69 pairs at
+Shake 0.3, 0 of 41 at 1.0), because earshot's host path puts bin j at (j + 0.5)/64 of 22.05 kHz,
+bin 0 at 172 Hz, so band 0 (40–160 Hz) gets no bin and never onsets (README "In Resolume");
+**no live audio device ever opened.** MSVC compiles
 snowglobe and earshot with no warnings (CI). earshot is a snapshot of
 `github.com/stoatworks-labs/earshot` at `8124191`, unpatched. A user guide (`docs/USER-GUIDE.md`)
 and a browser demo ("Browser demo" below); no OpenFX port.
@@ -225,10 +229,11 @@ Assumed: Stokes drag (Re → 0) up to Re 0.63 at the worst corner, where [Mercie
 extrapolated below its range, puts the true drag ~10 % higher; discs that keep their
 orientation; the slowest mode only, linear; the shake (Ω_max, the lift); the geometry (R, D,
 the card at the centre); 20 °C; n at the sodium D line; Resolume's FFT onsets usable
-(earshot's host fallback is frame-quantised and uncalibrated).
+(earshot's host fallback is frame-quantised and uncalibrated; for Kick they never come in
+v0.1.0, since band 0 gets no host bin).
 
-Not done: Arena on a Mac (and so Resolume's FFT onsets); a live device; presets, an OpenFX port;
-a 4K bench.
+Not done: Kick on Resolume's FFT (it can't fire in v0.1.0: README "In Resolume"); a live
+device; presets, an OpenFX port; a 4K bench.
 
 ## Would this hold on another rasteriser, at another raster?
 
@@ -474,8 +479,11 @@ https://snowglobe-demo.stoatworks-labs.com/ (2026-11-18), from `demo/`, deployed
    "time scale" control that is honest about being one.
 3. **Outside the globe is transparent.** An option to keep the clip around the globe (or a
    backdrop) was left out.
-4. **The kick gate's 0.25** is chosen against the harness's own music; nobody has measured
-   Resolume's FFT bins, so how it behaves on a real mix is unknown.
+4. **The kick gate's 0.25** is chosen against the harness's own music. **Kick on Resolume's
+   FFT never fires in v0.1.0** (Arena 7.29.0, 2026-11-19): earshot's Linear host layout centres
+   bin 0 at 172 Hz, above band 0's 160 Hz edge, so the kick band is empty on the host path. A
+   fix (a kick band that reaches the lowest host bin, or a host-path rule of its own) is code,
+   for after v0.1.0, and open.
 5. **Ω_max = 2 rad/s and the lift height 2R·S** are chosen; no source models a hand's shake.
 6. **No base, no figurine, no glass, no Fresnel**: the outer 9 % of the card is never seen, and
    the last pixels of the globe hold a squeezed ring with no reflection.

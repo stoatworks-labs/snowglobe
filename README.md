@@ -141,11 +141,6 @@ November, it never did). **Run in Resolume only briefly, over a still, in Arena 
 on a Mac, and no live audio device has ever been opened.**
 No OpenFX port; a [browser demo](#browser-demo) and a [user guide](https://stoatworks-labs.com/software/snowglobe/guide/).
 
-**The v0.1.1 macOS downloads aren't signed yet.** They're Developer ID-signed and notarised on
-my Mac after publication, and that was held up when the release went out, so for now the
-release carries CI's unsigned build and macOS may refuse it. Signed ones will replace them
-under the same names.
-
 > **Photosensitivity.** At the defaults it added no flash to any of Resolume's 33 demo clips.
 > **With Shake and Count both at full**, the snow can fill the globe and blank the clip on every
 > kick or beat: on one dark clip (Cyberspace 09) that crossed three flashes a second over a third

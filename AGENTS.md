@@ -18,15 +18,16 @@ mutants, 10 of 10 controls alive in the sweep and in the bare sweep, oxbow readi
 rendering the bundle with devices disabled. **Windows**: Arena 7.27.1 on
 win-lab (llvmpipe, no sound device), the fleet's gate on the release workflow's DLL, 9 passed,
 0 failed, 2 skipped (Audio Input and Audio need sound; Shake Now inert), on a pre-tag build and
-again on the v0.1.0 zip's own DLL (a different hash). **Arena 7.29.0 on
+again on the v0.1.0 zip's own DLL (a different hash), and on the v0.1.1 zip's own DLL
+(2026-11-19, sha256 d78f69a6…be85): 9, 0, 2 again. **Arena 7.29.0 on
 this Mac (2026-11-19)**, the v0.1.0 zip's bundle over REST: registers, 18 controls as declared,
 still at rest, every control acts, Beat shakes it on Arena's clock and Shake Now on a press;
 Kick never fired on Resolume's FFT with `Beat 001.wav` playing below (0 of 69 pairs at
 Shake 0.3, 0 of 41 at 1.0): earshot `8124191` put bin j at (j + 0.5)/64 of 22.05 kHz and gave
 each bin to the band holding its centre, so band 0 (40–160 Hz) got no bin. **v0.1.1 on the
-same Mac, the same day** (a universal bundle from the v0.1.1 source, before the tag): **Kick
-moved the globe in 69 of 69 pairs at Shake 0.3 and 40 of 40 at 1.0 with `Beat 001.wav`**, 0 of
-24 before the loop, at rest again after it; `Bass 001.wav` (no drums) shook it too, 40 of 40,
+same Mac, the same day** (the v0.1.1 zip's own signed bundle, and a pre-tag build before it):
+**Kick moved the globe in 69 of 69 pairs at Shake 0.3 and 40 of 40 at 1.0 with `Beat 001.wav`**
+(both bundles), 0 of 24 before the loop, at rest again after it; `Bass 001.wav` (no drums) shook it too, 40 of 40,
 because Resolume's bin 0 is 0–375 Hz ("Resolume's FFT, measured" below); Beat 24 of 24, Shake
 Now 0 of 9 unpressed and 24 of 24 after one press; the log reads "host audio at 48000 Hz".
 **No live audio device ever opened.** MSVC compiles

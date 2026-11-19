@@ -43,15 +43,15 @@ colour card at the defaults, 3.5 s after one press of Shake Now (`--frames 240 -
 
 ## Download
 
-**[v0.1.0](https://github.com/stoatworks-labs/snowglobe/releases/tag/v0.1.0)** — prebuilt for macOS and Windows. Pick your platform:
+**[v0.1.1](https://github.com/stoatworks-labs/snowglobe/releases/tag/v0.1.1)** — prebuilt for macOS and Windows. Pick your platform:
 
 <details>
 <summary><b>macOS</b> — Universal (Apple Silicon + Intel)</summary>
 
 | Build | Download | Size |
 | --- | --- | --- |
-| Universal (Apple Silicon + Intel) · .dmg disk image | [`snowglobe-0.1.0-macos-universal.dmg`](https://github.com/stoatworks-labs/snowglobe/releases/download/v0.1.0/snowglobe-0.1.0-macos-universal.dmg) | 598 KB |
-| Universal (Apple Silicon + Intel) · .zip archive | [`snowglobe-macos-universal.zip`](https://github.com/stoatworks-labs/snowglobe/releases/latest/download/snowglobe-macos-universal.zip) | 535 KB |
+| Universal (Apple Silicon + Intel) · .dmg disk image | [`snowglobe-0.1.1-macos-universal.dmg`](https://github.com/stoatworks-labs/snowglobe/releases/download/v0.1.1/snowglobe-0.1.1-macos-universal.dmg) | 603 KB |
+| Universal (Apple Silicon + Intel) · .zip archive | [`snowglobe-macos-universal.zip`](https://github.com/stoatworks-labs/snowglobe/releases/latest/download/snowglobe-macos-universal.zip) | 537 KB |
 
 </details>
 
@@ -60,7 +60,7 @@ colour card at the defaults, 3.5 s after one press of Shake Now (`--frames 240 -
 
 | Build | Download | Size |
 | --- | --- | --- |
-| x64 · .exe installer | [`snowglobe-0.1.0-windows-x86_64-setup.exe`](https://github.com/stoatworks-labs/snowglobe/releases/download/v0.1.0/snowglobe-0.1.0-windows-x86_64-setup.exe) | 361 KB |
+| x64 · .exe installer | [`snowglobe-0.1.1-windows-x86_64-setup.exe`](https://github.com/stoatworks-labs/snowglobe/releases/download/v0.1.1/snowglobe-0.1.1-windows-x86_64-setup.exe) | 363 KB |
 | x64 · .zip archive | [`snowglobe-windows-x86_64.zip`](https://github.com/stoatworks-labs/snowglobe/releases/latest/download/snowglobe-windows-x86_64.zip) | 251 KB |
 
 </details>
@@ -152,9 +152,10 @@ No OpenFX port; a [browser demo](#browser-demo) and a [user guide](https://stoat
 ### In Resolume
 
 - **Windows: Arena 7.27.1 on win-lab** (Mesa llvmpipe, no GPU, no sound device), with the x64 DLL
-  the release workflow built from this source, once from a build before the tag and again from the
-  v0.1.0 release's own zip (the two DLLs differ by hash): the fleet's Arena gate passed 9 checks,
-  failed none and skipped 2, both times. It loads, registers as `SW Snowglobe` / `SG01`, an effect, shows all 18 controls
+  the release workflow built from this source: for v0.1.0 once from a build before the tag and
+  again from the release's own zip (the two DLLs differ by hash), and for v0.1.1 from the
+  release's own zip (19 November 2026): the fleet's Arena gate passed 9 checks, failed none and
+  skipped 2, all three times. It loads, registers as `SW Snowglobe` / `SG01`, an effect, shows all 18 controls
   (Opacity and the 17 declared) with the declared name, order, type, range and default, renders,
   and 10 controls move the picture: with no sound the snow lies still on the glass, where Fill,
   Snow, Size, Range, Count, Globe and Mix act, and Shake acts under Trigger On at Beat, shaking on
@@ -176,21 +177,22 @@ No OpenFX port; a [browser demo](#browser-demo) and a [user guide](https://stoat
   without a press, and one Shake Now press over REST (held 0.3 s) changed 24 of 24 pairs. The
   plugin listed 12 audio inputs on its first frame under Kick and opened none; no microphone
   prompt appeared, and Arena's composition files were left as they were.
-- **Kick on Resolume's FFT, v0.1.1** (Arena 7.29.0 on the Mac, 19 November 2026, a universal
-  bundle built from the v0.1.1 source before the tag, mounted the same way). With Arena's demo
-  loop `Beat 001.wav` (the sound file) playing on the layer below, the Audio buffer on
-  Composition and Audio Input on Resolume FFT, **the globe moved in 69 of 69 snapshot pairs over
-  13.3 s at the default Shake 0.3** (a mean change of 12.3 levels in the globe), and in 40 of 40
-  at Shake 1.0. Before the loop started it was still (0 of 24 pairs), and after the loop
-  stopped it came to rest again. With Beat and the same loop it shook in 24 of 24; under
-  Button, 0 of 9 before a press and 24 of 24 after one. It registered with the same 18
-  controls, the About line reading "Snowglobe v0.1.1 - MIT - Stoatworks Labs,
-  stoatworks-labs.com", and the plugin's log reads "host audio at
-  48000 Hz: Resolume's FFT bins are 375 Hz each". With `Bass 001.wav`, a bass line with no
-  drums, Kick shook it too, in 40 of 40 pairs (mean 7.1): Resolume's lowest bin holds everything
-  from 0 to 375 Hz, kick and bass alike, so on Resolume's FFT Kick follows the low end, not the
-  kick drum alone. A capture device (never tried in Resolume) gives earshot the waveform and its
-  real 40–160 Hz band.
+- **Kick on Resolume's FFT, v0.1.1** (Arena 7.29.0 on the Mac, 19 November 2026, with the
+  v0.1.1 release's own universal bundle from its zip, Developer ID-signed and notarised, mounted
+  the same way). With Arena's demo loop `Beat 001.wav` (the sound file) playing on the layer
+  below, the Audio buffer on Composition and Audio Input on Resolume FFT, **the globe moved in 69
+  of 69 snapshot pairs over 13.5 s at the default Shake 0.3** (a mean change of 10.6 levels in
+  the globe), and in 40 of 40 at Shake 1.0 (mean 15.8). Before the loop started it was still
+  (0 of 24 pairs), and after the loop stopped it came to rest and stayed still (0 of 24). With
+  Beat and the same loop it shook in 24 of 24; under Button, 0 of 9 before a press and 24 of 24
+  after one. It registered with the same 18 controls, the About line reading "Snowglobe v0.1.1 -
+  MIT - Stoatworks Labs, stoatworks-labs.com", and the plugin's log reads "host audio at 48000
+  Hz: Resolume's FFT bins are 375 Hz each". With `Bass 001.wav`, a bass line with no drums, Kick
+  shook it too, in 40 of 40 pairs (mean 3.3): Resolume's lowest bin holds everything from 0 to
+  375 Hz, kick and bass alike, so on Resolume's FFT Kick follows the low end, not the kick drum
+  alone. A bundle built from the same source before the tag gave the same picture (69 of 69,
+  40 of 40, Bass 40 of 40). A capture device (never tried in Resolume) gives earshot the
+  waveform and its real 40–160 Hz band.
 - **Why v0.1.0's Kick never fired.** The same set-up with v0.1.0's own bundle moved in 0 of 69
   pairs at Shake 0.3, 0 of 41 at 1.0, and none with `Bass 001.wav` or on Local or External,
   while Beat with the loop playing shook it in 19 of 19. earshot read Resolume's 64 bins as
